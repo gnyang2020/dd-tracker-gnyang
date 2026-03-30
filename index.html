@@ -490,6 +490,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
 .goal-alert-dismiss button:active { color:#94a3b8; }
 
 @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+
+/* 월간 리포트 */
+.monthly-report-card { margin:12px 16px 4px; background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(59,130,246,0.04)); border:1px solid rgba(99,102,241,0.15); border-radius:14px; overflow:hidden; cursor:pointer; }
+.report-header { display:flex; align-items:center; gap:8px; padding:12px 16px; }
+.report-body { max-height:0; overflow:hidden; transition:max-height 0.3s ease; padding:0 16px; }
+.report-body.open { max-height:200px; padding:0 16px 14px; }
+.report-stats { display:flex; justify-content:space-around; text-align:center; }
+.report-stats .stat .num { font-size:20px; font-weight:800; color:#e2e8f0; }
+.report-stats .stat .lbl { font-size:10px; color:#64748b; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -667,6 +676,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
 
 <!-- 🏆 성취 카드 -->
 <div class="page active" id="page-achievement">
+  <!-- 월간 리포트 (캡쳐 시 숨김) -->
+  <div class="hide-on-capture" id="monthlyReport"></div>
   <!-- 목표 알림 배너 (캡쳐 시 숨김) -->
   <div class="goal-alerts hide-on-capture" id="goalAlerts"></div>
   <!-- 목표 바로가기 -->
@@ -893,12 +904,16 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
       <div class="add-goal-btn hide-on-capture" id="addGoalBtn" onclick="openAddModal()">+ 새 목표 추가</div>
     </div>
     <div class="archive-section hide-on-capture" style="margin:20px 16px;">
-      <div class="archive-toggle" onclick="toggleArchive()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 0;color:#64748b;font-size:13px;font-weight:600;">
-        <span class="arrow" id="archiveArrow" style="transition:transform 0.2s;font-size:10px;">▶</span>
-        <span>지난 목표 (<span id="archiveCount">0</span>/30)</span>
+      <div class="archive-toggle" onclick="toggleArchive()" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;">
+        <div id="archiveToggleIcon" style="width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;color:#818cf8;font-size:16px;font-weight:700;transition:transform 0.3s;flex-shrink:0;">+</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:#94a3b8;">지난 목표 보관함</div>
+          <div style="font-size:11px;color:#475569;margin-top:2px;"><span id="archiveCount">0</span>/50개 보관 중</div>
+        </div>
+        <span id="archiveArrow" style="color:#475569;font-size:12px;transition:transform 0.3s;">▼</span>
       </div>
       <div id="archiveList"></div>
-      <div style="font-size:10px;color:#334155;text-align:center;margin-top:8px;padding:8px;">최근 30개 기록만 보관되며 이후 자동으로 정리됩니다.</div>
+      <div style="font-size:10px;color:#334155;text-align:center;margin-top:8px;padding:8px;">최근 50개 기록만 보관되며 이후 자동으로 정리됩니다.</div>
     </div>
   </div>
 </div>
@@ -1018,7 +1033,7 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (pageMap[tab]) document.getElementById(pageMap[tab]).classList.add('active');
   if (tab === 'profile')     renderProfile();
-  if (tab === 'achievement') { renderAchievement(); updateShortcut(); renderGoalAlerts(); }
+  if (tab === 'achievement') { renderAchievement(); updateShortcut(); renderGoalAlerts(); if(typeof renderMonthlyReport==='function') renderMonthlyReport(); }
   if (tab === 'pending')     renderPending();
   if (tab === 'record')      renderRecord();
   if (tab === 'calendar')    renderCalendar();
@@ -1609,9 +1624,13 @@ function confirmAdd() {
   if (!p) return;
   if (!p.submissions) p.submissions=[];
   p.submissions.push({id:Date.now(),date,note,status:addStatus});
-  save(); closeOverlay('add-modal');
+  save();
   expanded[addPlatformId]=true;
+  // 모달 닫지 않고 입력 리셋 (달력 방식과 동일)
+  document.getElementById('add-note').value='';
+  addStatus='submitted'; renderStatusPick();
   renderRecord(); renderAchievement();
+  showToastGoal(`${p.name} 제안 기록 완료!`);
 }
 
 function delSub(platformId, subId) {
@@ -2083,13 +2102,14 @@ document.querySelectorAll('.overlay').forEach(el=>
 
 // ── 백업/복원 ──
 function exportData() {
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const backup = { state, goals: JSON.parse(localStorage.getItem('dd-goals')||'[]'), archive: JSON.parse(localStorage.getItem('dd-archive')||'[]'), alertDismissed: JSON.parse(localStorage.getItem('dd-alert-dismissed')||'{}'), version: 2 };
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.download=`디디트래커_백업_${new Date().toISOString().slice(0,10)}.json`;
   a.href=url; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  alert('백업 파일이 저장됐어요! 📦');
+  alert('백업 파일이 저장됐어요! (플랫폼+목표+보관함 포함) 📦');
 }
 
 function importData(input) {
@@ -2098,10 +2118,21 @@ function importData(input) {
   reader.onload=function(e){
     try {
       const imported=JSON.parse(e.target.result);
-      if(!imported.platforms) throw new Error();
       if(!confirm('기존 데이터를 덮어씌울까요?')) return;
-      state=imported; save();
+      // v2 백업 (goals+archive 포함)
+      if (imported.version === 2 && imported.state) {
+        state=imported.state; save();
+        if (imported.goals) { goals=imported.goals; }
+        if (imported.archive) { archive=imported.archive; }
+        if (imported.alertDismissed) { localStorage.setItem('dd-alert-dismissed', JSON.stringify(imported.alertDismissed)); }
+        savGoals();
+      } else if (imported.platforms) {
+        // v1 백업 (기존 호환)
+        state=imported; save();
+      } else { throw new Error(); }
       renderProfile(); renderAchievement(); renderPending(); renderRecord();
+      if (typeof updateShortcut==='function') updateShortcut();
+      if (typeof renderGoalAlerts==='function') renderGoalAlerts();
       alert('복원 완료! ✅');
     } catch { alert('올바른 백업 파일이 아니에요.'); }
     input.value='';
@@ -2343,7 +2374,7 @@ function cleanOrphanGoals() {
     archive.unshift({ ...g, status:'archived', completedAt:null, finalCount:0, finalPct:0 });
     goals.splice(idx, 1);
   });
-  if (archive.length > 30) archive = archive.slice(0, 30);
+  if (archive.length > 50) archive = archive.slice(0, 50);
   savGoals();
 }
 
@@ -2495,15 +2526,7 @@ function confirmDelete(idx) {
   showToastGoal(`${platName} 목표가 삭제되었어요`);
 }
 
-function openArchiveDetail(idx) {
-  const a = archive[idx];
-  const plat = state.platforms.find(p => p.id === a.platformId);
-  const isComplete = a.status === 'completed';
-  const days = daysBetween(a.startDate, a.completedAt || a.endDate);
-  const box = document.getElementById('archiveDetailContent');
-  box.innerHTML = `<div class="detail-header"><span class="plat-dot" style="background:${plat?.color || '#666'}"></span><span class="plat-name">${plat?.name || '알 수 없음'}</span></div><div class="detail-progress"><div class="detail-pct" style="color:${isComplete ? '#fbbf24' : '#64748b'}">${a.finalPct}%</div><div class="detail-status">${isComplete ? '🎉 목표 달성!' : '도전 완료'}</div></div><div class="detail-info"><div class="detail-row"><span class="label">목표</span><span class="value">${a.target}개</span></div><div class="detail-row"><span class="label">달성</span><span class="value">${a.finalCount}개</span></div><div class="detail-row"><span class="label">기간</span><span class="value">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</span></div>${isComplete ? `<div class="detail-row"><span class="label">달성일</span><span class="value">${formatDate(a.completedAt)}</span></div><div class="detail-row"><span class="label">소요</span><span class="value">${days}일</span></div>` : ''}</div><div class="detail-actions"><button onclick="deleteArchive(${idx})" style="background:rgba(239,68,68,0.08);color:#f87171;border:1px solid rgba(239,68,68,0.2);">🗑 보관 기록 삭제</button></div><div class="modal-btns" style="margin-top:12px;"><button class="cancel" onclick="closeArchiveDetail()">닫기</button></div>`;
-  document.getElementById('archiveDetailModal').classList.add('open');
-}
+// openArchiveDetail 은 아래쪽에서 스트릭 포함 버전으로 재정의됨
 function closeArchiveDetail() { document.getElementById('archiveDetailModal').classList.remove('open'); }
 function deleteArchive(idx) { archive.splice(idx, 1); savGoals(); closeArchiveDetail(); renderArchive(); showToastGoal('보관 기록이 삭제되었어요'); }
 
@@ -2597,9 +2620,13 @@ function archiveGoal(idx) {
   const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
   const pct = Math.min(100,Math.round((current/g.target)*100));
   archive.unshift({ ...g, status:pct>=100?'completed':'archived', completedAt:pct>=100?new Date().toISOString().slice(0,10):null, finalCount:current, finalPct:pct });
-  if (archive.length>30) archive=archive.slice(0,30);
+  if (archive.length>50) archive=archive.slice(0,50);
   goals.splice(idx,1); savGoals(); renderGoals(); renderArchive();
   showToastGoal(pct>=100 ? `${platName} 목표 달성! 보관함으로 이동` : `${platName} 목표가 보관함으로 이동`);
+  // 달성 완료 시 다음 목표 자동 제안 팝업
+  if (pct >= 100) {
+    setTimeout(() => showNextGoalSuggest(g.platformId, g.target, g.startDate, g.endDate), 500);
+  }
 }
 
 function extendGoal(idx) {
@@ -2610,15 +2637,8 @@ function extendGoal(idx) {
   showToastGoal('다시 도전! 새로운 1개월이 시작됩니다');
 }
 
-function renderArchive() {
-  const cnt = document.getElementById('archiveCount');
-  if (cnt) cnt.textContent=archive.length;
-  const list=document.getElementById('archiveList');
-  if (!list) return;
-  if (!archive.length) { list.innerHTML='<div style="text-align:center;padding:16px;color:#334155;font-size:12px;">아직 보관된 목표가 없어요</div>'; return; }
-  list.innerHTML=archive.map((a,i)=>{ const plat=state.platforms.find(p=>p.id===a.platformId); const badge=a.status==='completed'?'⭐':'🚀'; const label=a.status==='completed'?'달성!':`도전완료 (${a.finalPct}%)`; return `<div class="archive-item" onclick="openArchiveDetail(${i})"><span class="badge">${badge}</span><div class="info"><div class="name">${plat?.name||'?'} ${a.finalCount}/${a.target} ${label}</div><div class="detail">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</div></div></div>`; }).join('');
-}
-function toggleArchive() { const list=document.getElementById('archiveList'); const arrow=document.getElementById('archiveArrow'); if(list)list.classList.toggle('open'); if(arrow)arrow.classList.toggle('open'); }
+// renderArchive 은 아래쪽에서 실패 뱃지 포함 버전으로 재정의됨
+function toggleArchive() { const list=document.getElementById('archiveList'); const arrow=document.getElementById('archiveArrow'); const icon=document.getElementById('archiveToggleIcon'); if(list)list.classList.toggle('open'); if(arrow)arrow.classList.toggle('open'); if(icon){ const isOpen=list&&list.classList.contains('open'); icon.textContent=isOpen?'−':'+'; icon.style.transform=isOpen?'rotate(180deg)':'rotate(0deg)'; } }
 
 function showCelebrate(platformId, target, days) {
   const plat=state.platforms.find(p=>p.id===platformId);
@@ -2716,10 +2736,10 @@ function renderGoalAlerts() {
       alerts.push({ key:aKey, icon:'🏆', msg:`<b>${plat.name}</b> 목표를 달성했어요! 새 목표를 세우려면 보관함으로 이동해 주세요.`, persistent:true, goalIdx: goals.indexOf(g) });
       return;
     }
-    // ★ 만료
+    // ★ 만료 (연장/실패기록/보관 선택지)
     if (left === 0) {
       const aKey = g.id + '_expired';
-      if (dismissed[aKey] !== '__permanent__') alerts.push({ key:aKey, icon:'📦', msg:`<b>${plat.name}</b> 목표 기간이 만료되었어요. 연장하거나 보관함으로 이동하세요.`, dismissType:'daily' });
+      if (dismissed[aKey] !== '__permanent__') alerts.push({ key:aKey, icon:'📦', msg:`<b>${plat.name}</b> 목표 기간이 만료되었어요.`, dismissType:'daily', expired:true, goalIdx: goals.indexOf(g) });
       return;
     }
     // ★ 마감 1일 전 (매일 표시)
@@ -2754,6 +2774,9 @@ function renderGoalAlerts() {
   let alertHtml = alerts.map(a => {
     if (a.persistent && a.goalIdx !== undefined) {
       return `<div class="goal-alert-item" id="alert-${a.key}" style="border-color:rgba(250,204,21,0.2);background:linear-gradient(135deg,rgba(250,204,21,0.06),rgba(168,85,247,0.04));"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button onclick="archiveGoalFromAlert(${a.goalIdx})" style="flex-shrink:0;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.3);color:#fbbf24;font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;">보관함 이동</button></div>`;
+    }
+    if (a.expired && a.goalIdx !== undefined) {
+      return `<div class="goal-alert-item" id="alert-${a.key}" style="border-color:rgba(99,102,241,0.2);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(59,130,246,0.04));flex-wrap:wrap;"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><div style="display:flex;gap:6px;width:100%;margin-top:8px;"><button onclick="extendGoal(${a.goalIdx});renderGoalAlerts()" style="flex:1;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8;font-size:11px;padding:6px 8px;border-radius:8px;cursor:pointer;font-family:inherit;">🔄 연장</button><button onclick="failGoal(${a.goalIdx})" style="flex:1;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#f87171;font-size:11px;padding:6px 8px;border-radius:8px;cursor:pointer;font-family:inherit;">❌ 실패 기록</button><button onclick="archiveGoalFromAlert(${a.goalIdx})" style="flex:1;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.3);color:#fbbf24;font-size:11px;padding:6px 8px;border-radius:8px;cursor:pointer;font-family:inherit;">📦 보관</button></div></div>`;
     }
     return `<div class="goal-alert-item" id="alert-${a.key}"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button class="alert-close" onclick="dismissAlertUI('${a.key}')">&times;</button></div>`;
   }).join('');
@@ -2853,8 +2876,189 @@ window.confirmAdd = function() {
   renderGoalAlerts();
 }
 
+// ── 실패 기록 (만료 목표를 실패로 보관) ──
+function failGoal(idx) {
+  if (idx < 0 || idx >= goals.length) return;
+  const g = goals[idx];
+  const plat = state.platforms.find(p=>p.id===g.platformId);
+  const platName = plat?.name || '목표';
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const pct = Math.min(100,Math.round((current/g.target)*100));
+  archive.unshift({ ...g, status:'failed', completedAt:null, finalCount:current, finalPct:pct });
+  if (archive.length>50) archive=archive.slice(0,50);
+  goals.splice(idx,1); savGoals(); renderGoals(); renderArchive(); renderGoalAlerts(); updateShortcut();
+  showToastGoal(`${platName} 목표가 실패로 기록되었어요`);
+}
+
+// ── 스트릭 계산 (같은 플랫폼에서 연속 달성, 실패 시에만 끊김) ──
+function getStreak(platformId) {
+  const platArchive = archive.filter(a => a.platformId === platformId).sort((a,b) => new Date(b.completedAt||b.endDate) - new Date(a.completedAt||a.endDate));
+  let streak = 0;
+  for (const a of platArchive) {
+    if (a.status === 'completed') streak++;
+    else if (a.status === 'failed') break;
+    else continue; // archived (미달성 보관) 은 스킵 — 실패로 명시하지 않았으니
+  }
+  return streak;
+}
+
+// ── 다음 목표 자동 제안 팝업 ──
+function showNextGoalSuggest(platformId, prevTarget, prevStart, prevEnd) {
+  const plat = state.platforms.find(p=>p.id===platformId);
+  if (!plat) return;
+  const streak = getStreak(platformId);
+  const prevDays = daysBetween(prevStart, prevEnd);
+  // 난이도 추천: 빠르게 달성했으면 올리기, 아니면 유지
+  const actualDays = daysBetween(prevStart, new Date().toISOString().slice(0,10));
+  let suggestTarget = prevTarget;
+  let diffMsg = '';
+  if (actualDays <= prevDays * 0.5) {
+    suggestTarget = Math.min(100, prevTarget + Math.max(2, Math.round(prevTarget * 0.2)));
+    diffMsg = `절반 기간 만에 달성! 도전적으로 ${suggestTarget}개 추천`;
+  } else if (actualDays <= prevDays * 0.75) {
+    suggestTarget = Math.min(100, prevTarget + Math.max(1, Math.round(prevTarget * 0.1)));
+    diffMsg = `여유 있게 달성했어요! ${suggestTarget}개 추천`;
+  } else {
+    diffMsg = `이번과 같은 ${suggestTarget}개로 꾸준히!`;
+  }
+  const streakMsg = streak > 1 ? `🔥 ${streak}연속 달성 중!` : '';
+
+  const box = document.getElementById('detailContent');
+  box.innerHTML = `
+    <div style="text-align:center;padding:8px 0;">
+      <div style="font-size:36px;margin-bottom:8px;">🎯</div>
+      <h3 style="font-size:16px;color:#e2e8f0;margin-bottom:4px;">다음 목표를 세울까요?</h3>
+      ${streakMsg ? `<div style="font-size:13px;color:#fbbf24;font-weight:600;margin-bottom:8px;">${streakMsg}</div>` : ''}
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">${diffMsg}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">
+        <span class="plat-dot" style="background:${plat.color};width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+        <span style="color:#e2e8f0;font-weight:600;">${plat.name}</span>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;color:#94a3b8;margin-bottom:6px;">목표 횟수</label>
+        <input type="number" id="nextGoalTarget" min="1" max="100" value="${suggestTarget}" style="width:120px;padding:10px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#e2e8f0;font-size:16px;font-family:inherit;outline:none;text-align:center;">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeDetailModal()" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:rgba(255,255,255,0.06);color:#94a3b8;">나중에</button>
+      <button onclick="createNextGoal(${platformId})" style="flex:1;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#6366f1,#3b82f6);color:#fff;">목표 시작!</button>
+    </div>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function createNextGoal(platformId) {
+  const target = parseInt(document.getElementById('nextGoalTarget').value);
+  if (!target||target<1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
+  const now = new Date();
+  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:now.toISOString().slice(0,10), endDate:addDays(now,30).toISOString().slice(0,10), status:'active', completedAt:null, createdAt:now.toISOString().slice(0,10) });
+  savGoals(); closeDetailModal(); renderGoals(); updateShortcut(); renderGoalAlerts();
+  const plat = state.platforms.find(p=>p.id===platformId);
+  showToastGoal(`${plat.name} 새 목표 ${target}개 설정 완료! 🚀`);
+}
+
+// ── 보관함 상세에 스트릭 + 달성/실패 표시 ──
+function openArchiveDetail(idx) {
+  const a = archive[idx];
+  const plat = state.platforms.find(p => p.id === a.platformId);
+  const isComplete = a.status === 'completed';
+  const isFailed = a.status === 'failed';
+  const days = daysBetween(a.startDate, a.completedAt || a.endDate);
+  const streak = getStreak(a.platformId);
+  const statusLabel = isComplete ? '🎉 목표 달성!' : (isFailed ? '❌ 미달성' : '📦 도전 완료');
+  const statusColor = isComplete ? '#fbbf24' : (isFailed ? '#f87171' : '#64748b');
+  const box = document.getElementById('archiveDetailContent');
+  box.innerHTML = `<div class="detail-header"><span class="plat-dot" style="background:${plat?.color || '#666'}"></span><span class="plat-name">${plat?.name || '알 수 없음'}</span></div><div class="detail-progress"><div class="detail-pct" style="color:${statusColor}">${a.finalPct}%</div><div class="detail-status">${statusLabel}</div>${streak > 1 && isComplete ? `<div style="font-size:12px;color:#fbbf24;margin-top:4px;">🔥 현재 ${streak}연속 달성</div>` : ''}</div><div class="detail-info"><div class="detail-row"><span class="label">목표</span><span class="value">${a.target}개</span></div><div class="detail-row"><span class="label">달성</span><span class="value">${a.finalCount}개</span></div><div class="detail-row"><span class="label">기간</span><span class="value">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</span></div>${isComplete ? `<div class="detail-row"><span class="label">달성일</span><span class="value">${formatDate(a.completedAt)}</span></div><div class="detail-row"><span class="label">소요</span><span class="value">${days}일</span></div>` : ''}</div><div class="detail-actions"><button onclick="deleteArchive(${idx})" style="background:rgba(239,68,68,0.08);color:#f87171;border:1px solid rgba(239,68,68,0.2);">🗑 보관 기록 삭제</button></div><div class="modal-btns" style="margin-top:12px;"><button class="cancel" onclick="closeArchiveDetail()">닫기</button></div>`;
+  document.getElementById('archiveDetailModal').classList.add('open');
+}
+
+// ── 보관함 렌더에 달성/실패 뱃지 구분 ──
+function renderArchive() {
+  const cnt = document.getElementById('archiveCount');
+  if (cnt) cnt.textContent=archive.length;
+  const list=document.getElementById('archiveList');
+  if (!list) return;
+  if (!archive.length) { list.innerHTML='<div style="text-align:center;padding:16px;color:#334155;font-size:12px;">아직 보관된 목표가 없어요</div>'; return; }
+  list.innerHTML=archive.map((a,i)=>{ const plat=state.platforms.find(p=>p.id===a.platformId); const badge=a.status==='completed'?'⭐':(a.status==='failed'?'❌':'🚀'); const label=a.status==='completed'?'달성!':(a.status==='failed'?`미달성 (${a.finalPct}%)`:`도전완료 (${a.finalPct}%)`); return `<div class="archive-item" onclick="openArchiveDetail(${i})"><span class="badge">${badge}</span><div class="info"><div class="name">${plat?.name||'?'} ${a.finalCount}/${a.target} ${label}</div><div class="detail">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</div></div></div>`; }).join('');
+}
+
+// ── 월간 리포트 ──
+function renderMonthlyReport() {
+  const wrap = document.getElementById('monthlyReport');
+  if (!wrap) return;
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  const lmStart = lastMonth.toISOString().slice(0,10);
+  const lmEnd = lastMonthEnd.toISOString().slice(0,10);
+  const monthLabel = `${lastMonth.getFullYear()}년 ${lastMonth.getMonth()+1}월`;
+
+  // 지난 달 보관된 목표들
+  const lmArchive = archive.filter(a => {
+    const comp = a.completedAt || a.endDate;
+    return comp >= lmStart && comp <= lmEnd;
+  });
+
+  if (lmArchive.length === 0) { wrap.innerHTML = ''; return; }
+
+  const completed = lmArchive.filter(a => a.status === 'completed').length;
+  const failed = lmArchive.filter(a => a.status === 'failed').length;
+  const total = lmArchive.length;
+
+  // 지난 달 총 제안 수
+  let totalSubs = 0;
+  let bestPlat = '';
+  let bestCount = 0;
+  state.platforms.forEach(p => {
+    const count = (p.submissions||[]).filter(s => s.date >= lmStart && s.date <= lmEnd).length;
+    totalSubs += count;
+    if (count > bestCount) { bestCount = count; bestPlat = p.name; }
+  });
+
+  wrap.innerHTML = `
+    <div class="monthly-report-card" onclick="this.querySelector('.report-body').classList.toggle('open')">
+      <div class="report-header">
+        <span style="font-size:14px;">📊</span>
+        <span style="font-size:13px;font-weight:700;color:#e2e8f0;">${monthLabel} 리포트</span>
+        <span style="font-size:10px;color:#475569;margin-left:auto;">탭하여 보기</span>
+      </div>
+      <div class="report-body">
+        <div class="report-stats">
+          <div class="stat"><div class="num">${total}</div><div class="lbl">목표</div></div>
+          <div class="stat"><div class="num" style="color:#22c55e">${completed}</div><div class="lbl">달성</div></div>
+          <div class="stat"><div class="num" style="color:#f87171">${failed}</div><div class="lbl">미달성</div></div>
+          <div class="stat"><div class="num" style="color:#60a5fa">${totalSubs}</div><div class="lbl">총 제안</div></div>
+        </div>
+        ${bestPlat ? `<div style="text-align:center;font-size:12px;color:#94a3b8;margin-top:8px;">최고 기록: <b style="color:#fbbf24">${bestPlat}</b> ${bestCount}건</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ── 목표 상세 모달에 스트릭 표시 추가 ──
+const _origOpenDetailModal = openDetailModal;
+// openDetailModal은 이미 위에 정의됨 — 스트릭 정보만 주입하도록 래핑
+const _openDetailModalWithStreak = function(idx) {
+  _origOpenDetailModal(idx);
+  // 스트릭 표시 추가
+  const g = goals[idx];
+  if (!g) return;
+  const streak = getStreak(g.platformId);
+  if (streak > 0) {
+    const box = document.getElementById('detailContent');
+    const headerEl = box.querySelector('.detail-header');
+    if (headerEl && !box.querySelector('.streak-badge')) {
+      const streakEl = document.createElement('div');
+      streakEl.className = 'streak-badge';
+      streakEl.style.cssText = 'text-align:center;font-size:12px;color:#fbbf24;font-weight:600;margin:8px 0 0;';
+      streakEl.textContent = `🔥 ${streak}연속 달성 중`;
+      headerEl.after(streakEl);
+    }
+  }
+};
+window.openDetailModal = function(idx) { _openDetailModalWithStreak(idx); };
+
 renderGoalAlerts();
 updateShortcut();
+renderMonthlyReport();
 
 </script>
 </body>
