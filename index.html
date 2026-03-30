@@ -2030,6 +2030,514 @@ if ('serviceWorker' in navigator) {
     });
   }).catch(e => console.log('SW fail', e));
 }
+
+
+// ══════════════════════════════════════
+// DD.Tracker 목표 기능 통합
+// ══════════════════════════════════════
+
+let goals = JSON.parse(localStorage.getItem('dd-goals') || '[]');
+let archive = JSON.parse(localStorage.getItem('dd-archive') || '[]');
+
+function savGoals() {
+  localStorage.setItem('dd-goals', JSON.stringify(goals));
+  localStorage.setItem('dd-archive', JSON.stringify(archive));
+}
+
+// ── 유틸 ──
+function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate()+days); return d; }
+function formatDate(d) { const dt=new Date(d); return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`; }
+function daysLeft(endDate) { const now=new Date(); now.setHours(0,0,0,0); const end=new Date(endDate); end.setHours(0,0,0,0); return Math.max(0,Math.ceil((end-now)/86400000)); }
+function daysBetween(a,b) { return Math.ceil((new Date(b)-new Date(a))/86400000); }
+function getGoalRecordCount(platformId, startDate, endDate) { 
+  const p = state.platforms.find(p => p.id === platformId); 
+  if (!p || !p.submissions) return 0; 
+  return p.submissions.filter(s => s.date >= startDate && s.date <= endDate).length; 
+}
+function pctColor(pct) { if(pct>=100) return '#fbbf24'; if(pct>=70) return '#22c55e'; if(pct>=40) return '#3b82f6'; return '#6366f1'; }
+
+// ── 로켓 렌더링 ──
+function renderRocket(pct, color, goalId) {
+  const rocketBottom = Math.min(95, pct);
+  const trailHeight = Math.min(90, pct * 0.9);
+  const isComplete = pct >= 100;
+  const starChars = ['✦','✧','⋆','✶','·'];
+  const bgStars = [
+    {top:'8%',left:'15%',delay:'0s'},{top:'25%',left:'75%',delay:'0.7s'},
+    {top:'45%',left:'10%',delay:'1.3s'},{top:'62%',left:'80%',delay:'0.3s'},
+    {top:'78%',left:'45%',delay:'1s'},
+  ];
+  const flames = pct > 0 && !isComplete ? `
+    <span class="flame-particle" style="left:calc(50% - 2px);background:#fb923c;animation-delay:0s;"></span>
+    <span class="flame-particle" style="left:calc(50% + 1px);background:#fbbf24;animation-delay:0.3s;"></span>
+    <span class="flame-particle" style="left:calc(50% - 4px);background:#f97316;animation-delay:0.6s;"></span>
+  ` : '';
+
+  let spreadStars = '';
+  if (isComplete) {
+    const spreadChars = ['✦','✧','⋆','✶','·'];
+    const spreadColors = ['#fbbf24','#a78bfa','#60a5fa','#f472b6','#34d399','#fb923c','#e2e8f0','#818cf8'];
+    for (let i = 0; i < 14; i++) {
+      const angle = (Math.PI * 2 / 14) * i + (Math.random()*0.3);
+      const dist = 12 + Math.random() * 25;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const ch = spreadChars[Math.floor(Math.random()*spreadChars.length)];
+      const cl = spreadColors[Math.floor(Math.random()*spreadColors.length)];
+      const dur = 2 + Math.random() * 1.5;
+      const delay = Math.random() * 1.5;
+      const size = 5 + Math.random() * 6;
+      spreadStars += `<span class="star-spread" style="--ss-tx:${tx}px;--ss-ty:${ty}px;--ss-dur:${dur}s;--ss-delay:${delay}s;font-size:${size}px;color:${cl}">${ch}</span>`;
+    }
+  }
+
+  return `
+    <div class="rocket-track" id="track-${goalId}">
+      <div class="stars">
+        ${bgStars.map(s=>`<span class="star" style="top:${s.top};left:${s.left};animation-delay:${s.delay}">✦</span>`).join('')}
+      </div>
+      ${isComplete ? `<div class="star-center">⭐</div><div class="star-spread-wrap">${spreadStars}</div>` : `<div class="flag">⭐</div>`}
+      <div class="rocket-wrap" style="bottom:${rocketBottom}%" id="rocket-${goalId}">
+        <span class="rocket-emoji ${isComplete ? '' : 'rocket-float'}">${isComplete ? '' : '🚀'}</span>
+        ${flames}
+      </div>
+      <div class="trail" style="height:${trailHeight}%;background:linear-gradient(to top, ${color}88, ${color}00)"></div>
+    </div>`;
+}
+
+// ── 목표 카드 렌더링 ──
+function renderGoals() {
+  const wrap = document.getElementById('activeGoals');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (goals.length === 0) {
+    wrap.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:#334155;">
+        <div style="font-size:40px;margin-bottom:12px;">🚀</div>
+        <div style="font-size:14px;color:#64748b;">아직 설정된 목표가 없어요</div>
+        <div style="font-size:12px;color:#334155;margin-top:4px;">아래 버튼으로 이번 달 목표를 세워보세요!</div>
+      </div>`;
+    updateShortcut();
+    return;
+  }
+
+  goals.forEach((g, idx) => {
+    const plat = state.platforms.find(p => p.id === g.platformId);
+    if (!plat) return;
+    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+    const pct = Math.min(100, Math.round((current / g.target) * 100));
+    const left = daysLeft(g.endDate);
+    const isCompleted = pct >= 100;
+    const isExpired = left <= 0 && !isCompleted;
+
+    const card = document.createElement('div');
+    card.className = 'goal-card' + (isCompleted ? ' completed' : '');
+    card.onclick = () => openDetailModal(idx);
+    card.innerHTML = `
+      <div class="left">
+        <div class="plat-name">
+          <span class="plat-dot" style="background:${plat.color}"></span>
+          ${plat.name}
+        </div>
+        <div class="goal-meta">
+          목표 ${g.target}개 · ${isExpired ? '기간 만료' : (isCompleted ? '달성 완료!' : '남은 ' + left + '일')}
+        </div>
+        <div class="goal-nums">
+          <div class="goal-big">${Math.min(current, g.target)}<span> / ${g.target}</span></div>
+          <div class="goal-pct" style="color:${pctColor(pct)}">${pct}%</div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${pct}%;background:linear-gradient(90deg,${plat.color},${pctColor(pct)})"></div>
+          </div>
+        </div>
+      </div>
+      <div class="right">
+        ${renderRocket(pct, plat.color, g.id)}
+      </div>`;
+    wrap.appendChild(card);
+  });
+  updateShortcut();
+  updateAddBtn();
+}
+
+function openDetailModal(idx) {
+  const g = goals[idx];
+  const plat = state.platforms.find(p => p.id === g.platformId);
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const pct = Math.min(100, Math.round((current / g.target) * 100));
+  const left = daysLeft(g.endDate);
+  const isCompleted = pct >= 100;
+  const isExpired = left <= 0 && !isCompleted;
+  const elapsed = daysBetween(g.startDate, new Date().toISOString().slice(0,10));
+
+  const box = document.getElementById('detailContent');
+  box.innerHTML = `
+    <div class="detail-header">
+      <span class="plat-dot" style="background:${plat.color}"></span>
+      <span class="plat-name">${plat.name}</span>
+    </div>
+    <div class="detail-progress">
+      <div class="detail-pct" style="color:${pctColor(pct)}">${pct}%</div>
+      <div class="detail-status">${isCompleted ? '🎉 목표 달성!' : (isExpired ? '⏰ 기간 만료' : `${current}/${g.target} 진행 중`)}</div>
+    </div>
+    <div class="detail-info">
+      <div class="detail-row"><span class="label">목표 횟수</span><span class="value">${g.target}개</span></div>
+      <div class="detail-row"><span class="label">현재 진행</span><span class="value">${Math.min(current, g.target)}개</span></div>
+      <div class="detail-row"><span class="label">시작일</span><span class="value">${formatDate(g.startDate)}</span></div>
+      <div class="detail-row"><span class="label">마감일</span><span class="value">${formatDate(g.endDate)}</span></div>
+      <div class="detail-row"><span class="label">남은 기간</span><span class="value">${isExpired ? '만료' : left + '일'}</span></div>
+      <div class="detail-row"><span class="label">경과일</span><span class="value">${elapsed}일</span></div>
+    </div>
+    <div class="detail-actions">
+      ${isCompleted ? `<button onclick="replayCelebrate('${g.platformId}',${g.target},'${g.startDate}');closeDetailModal()" style="background:linear-gradient(135deg,rgba(250,204,21,0.15),rgba(168,85,247,0.1));color:#fbbf24;border:1px solid rgba(250,204,21,0.25);">✨ 달성 축하 다시 보기</button><button onclick="archiveGoal(${idx});closeDetailModal()" style="background:rgba(250,204,21,0.15);color:#fbbf24;border:1px solid rgba(250,204,21,0.3);">✅ 보관함으로 이동</button>` : ''}
+      ${isExpired ? `<button onclick="extendGoal(${idx});closeDetailModal()" style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);">🔄 다음 달 다시 도전</button>` : ''}
+      <button onclick="openEditModal(${idx})" style="background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">✏️ 목표 수정</button>
+      ${!isCompleted ? `<button onclick="archiveGoal(${idx});closeDetailModal()" style="background:rgba(255,255,255,0.03);color:#64748b;border:1px solid rgba(255,255,255,0.06);">📦 보관함으로 이동</button>` : ''}
+      <button onclick="deleteGoal(${idx})" style="background:rgba(239,68,68,0.08);color:#f87171;border:1px solid rgba(239,68,68,0.2);">🗑 목표 삭제</button>
+    </div>
+    <div class="modal-btns" style="margin-top:12px;">
+      <button class="cancel" onclick="closeDetailModal()">닫기</button>
+    </div>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetailModal() { document.getElementById('detailModal').classList.remove('open'); }
+
+function openEditModal(idx) {
+  closeDetailModal();
+  const g = goals[idx];
+  const box = document.getElementById('detailContent');
+  box.innerHTML = `<h3>✏️ 목표 수정</h3><div class="modal-field"><label>목표 제안 횟수</label><input type="number" id="editTarget" min="1" max="100" value="${g.target}"></div><div class="modal-period">기간: ${formatDate(g.startDate)} ~ ${formatDate(g.endDate)}<div style="font-size:10px;color:#475569;margin-top:4px;">* 기간은 변경할 수 없어요</div></div><div class="modal-btns"><button class="cancel" onclick="closeDetailModal()">취소</button><button class="confirm" onclick="saveEdit(${idx})">저장</button></div>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function saveEdit(idx) {
+  const target = parseInt(document.getElementById('editTarget').value);
+  if (!target || target < 1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
+  const current = getGoalRecordCount(goals[idx].platformId, goals[idx].startDate, goals[idx].endDate);
+  const oldStatus = goals[idx].status;
+  goals[idx].target = target;
+  if (current < target) goals[idx].status = 'active';
+  if (current >= target && oldStatus === 'active') {
+    goals[idx].status = 'completed_pending';
+    savGoals(); closeDetailModal(); renderGoals();
+    const plat = state.platforms.find(p=>p.id===goals[idx].platformId);
+    const days = daysBetween(goals[idx].startDate, new Date().toISOString().slice(0,10));
+    setTimeout(()=>showCelebrate(goals[idx].platformId, target, days), 300);
+    showToastGoal('목표가 수정되었어요');
+    return;
+  }
+  savGoals(); closeDetailModal(); renderGoals();
+  showToastGoal('목표가 수정되었어요');
+}
+
+function deleteGoal(idx) {
+  const g = goals[idx];
+  const plat = state.platforms.find(p => p.id === g.platformId);
+  const box = document.getElementById('detailContent');
+  box.innerHTML = `<h3>목표 삭제</h3><div style="text-align:center;padding:16px 0;color:#94a3b8;font-size:13px;line-height:1.7;"><strong style="color:#f87171;">${plat.name}</strong> 목표를 삭제할까요?<br>삭제하면 복구할 수 없어요.</div><div class="modal-btns"><button class="cancel" onclick="closeDetailModal()">취소</button><button class="danger" onclick="confirmDelete(${idx})">삭제</button></div>`;
+}
+
+function confirmDelete(idx) {
+  const plat = state.platforms.find(p => p.id === goals[idx].platformId);
+  goals.splice(idx, 1);
+  savGoals(); closeDetailModal(); renderGoals(); renderArchive();
+  showToastGoal(`${plat.name} 목표가 삭제되었어요`);
+}
+
+function openArchiveDetail(idx) {
+  const a = archive[idx];
+  const plat = state.platforms.find(p => p.id === a.platformId);
+  const isComplete = a.status === 'completed';
+  const days = daysBetween(a.startDate, a.completedAt || a.endDate);
+  const box = document.getElementById('archiveDetailContent');
+  box.innerHTML = `<div class="detail-header"><span class="plat-dot" style="background:${plat?.color || '#666'}"></span><span class="plat-name">${plat?.name || '알 수 없음'}</span></div><div class="detail-progress"><div class="detail-pct" style="color:${isComplete ? '#fbbf24' : '#64748b'}">${a.finalPct}%</div><div class="detail-status">${isComplete ? '🎉 목표 달성!' : '도전 완료'}</div></div><div class="detail-info"><div class="detail-row"><span class="label">목표</span><span class="value">${a.target}개</span></div><div class="detail-row"><span class="label">달성</span><span class="value">${a.finalCount}개</span></div><div class="detail-row"><span class="label">기간</span><span class="value">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</span></div>${isComplete ? `<div class="detail-row"><span class="label">달성일</span><span class="value">${formatDate(a.completedAt)}</span></div><div class="detail-row"><span class="label">소요</span><span class="value">${days}일</span></div>` : ''}</div><div class="detail-actions"><button onclick="deleteArchive(${idx})" style="background:rgba(239,68,68,0.08);color:#f87171;border:1px solid rgba(239,68,68,0.2);">🗑 보관 기록 삭제</button></div><div class="modal-btns" style="margin-top:12px;"><button class="cancel" onclick="closeArchiveDetail()">닫기</button></div>`;
+  document.getElementById('archiveDetailModal').classList.add('open');
+}
+function closeArchiveDetail() { document.getElementById('archiveDetailModal').classList.remove('open'); }
+function deleteArchive(idx) { archive.splice(idx, 1); savGoals(); closeArchiveDetail(); renderArchive(); showToastGoal('보관 기록이 삭제되었어요'); }
+
+function updateShortcut() {
+  const title = document.getElementById('shortcutTitle');
+  const summary = document.getElementById('shortcutSummary');
+  const el = document.getElementById('goalShortcut');
+  if (!title || !summary) return;
+  if (goals.length === 0) {
+    el.classList.add('empty');
+    title.textContent = '🚀 이번 달 목표 세우기';
+    summary.textContent = '플랫폼별 제안 목표를 설정해보세요';
+  } else {
+    el.classList.remove('empty');
+    const sums = goals.map(g => {
+      const plat = state.platforms.find(p=>p.id===g.platformId);
+      const cur = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+      return `${plat?.name?.slice(0,2)} ${Math.min(cur,g.target)}/${g.target}`;
+    });
+    title.textContent = '🚀 이번 달 목표 확인하기';
+    summary.textContent = sums.join(' · ');
+  }
+}
+
+function updateAddBtn() {
+  const btn = document.getElementById('addGoalBtn');
+  if (!btn) return;
+  const used = goals.map(g=>g.platformId);
+  const avail = state.platforms.filter(p=>!used.includes(p.id));
+  if (avail.length === 0) { btn.style.display='none'; }
+  else { btn.style.display=''; btn.textContent=`+ 새 목표 추가 (${avail.length}개 플랫폼 설정 가능)`; }
+}
+
+function openGoalOverlay() {
+  const overlay = document.getElementById('goalOverlay');
+  if (overlay) overlay.classList.add('open');
+  renderGoals(); renderArchive();
+}
+function closeGoalOverlay() { const overlay = document.getElementById('goalOverlay'); if (overlay) overlay.classList.remove('open'); }
+
+function openAddModal() {
+  const used = goals.map(g=>g.platformId);
+  const avail = state.platforms.filter(p=>!used.includes(p.id));
+  if (!avail.length) { showToastGoal('모든 플랫폼에 목표가 설정되어 있어요'); return; }
+  document.getElementById('modalPlat').innerHTML = avail.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  document.getElementById('modalTarget').value = '';
+  document.getElementById('modalEndDate').textContent = formatDate(addDays(new Date(),30));
+  document.getElementById('addModal').classList.add('open');
+}
+function closeAddModal() { document.getElementById('addModal').classList.remove('open'); }
+
+function createGoal() {
+  const platformId = document.getElementById('modalPlat').value;
+  const target = parseInt(document.getElementById('modalTarget').value);
+  if (!target||target<1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
+  const now = new Date();
+  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:now.toISOString().slice(0,10), endDate:addDays(now,30).toISOString().slice(0,10), status:'active', completedAt:null, createdAt:now.toISOString().slice(0,10) });
+  savGoals(); closeAddModal(); renderGoals();
+  const plat = state.platforms.find(p=>p.id===platformId);
+  showToastGoal(`${plat.name} 목표 ${target}개 설정 완료!`);
+}
+
+function archiveGoal(idx) {
+  const g = goals[idx];
+  const plat = state.platforms.find(p=>p.id===g.platformId);
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const pct = Math.min(100,Math.round((current/g.target)*100));
+  archive.unshift({ ...g, status:pct>=100?'completed':'archived', completedAt:pct>=100?new Date().toISOString().slice(0,10):null, finalCount:current, finalPct:pct });
+  if (archive.length>30) archive=archive.slice(0,30);
+  goals.splice(idx,1); savGoals(); renderGoals(); renderArchive();
+  showToastGoal(pct>=100 ? `${plat.name} 목표 달성! 보관함으로 이동` : `${plat.name} 목표가 보관함으로 이동`);
+}
+
+function extendGoal(idx) {
+  const now=new Date();
+  goals[idx].startDate=now.toISOString().slice(0,10);
+  goals[idx].endDate=addDays(now,30).toISOString().slice(0,10);
+  savGoals(); renderGoals();
+  showToastGoal('다시 도전! 새로운 1개월이 시작됩니다');
+}
+
+function renderArchive() {
+  const cnt = document.getElementById('archiveCount');
+  if (cnt) cnt.textContent=archive.length;
+  const list=document.getElementById('archiveList');
+  if (!list) return;
+  if (!archive.length) { list.innerHTML='<div style="text-align:center;padding:16px;color:#334155;font-size:12px;">아직 보관된 목표가 없어요</div>'; return; }
+  list.innerHTML=archive.map((a,i)=>{ const plat=state.platforms.find(p=>p.id===a.platformId); const badge=a.status==='completed'?'⭐':'🚀'; const label=a.status==='completed'?'달성!':`도전완료 (${a.finalPct}%)`; return `<div class="archive-item" onclick="openArchiveDetail(${i})"><span class="badge">${badge}</span><div class="info"><div class="name">${plat?.name||'?'} ${a.finalCount}/${a.target} ${label}</div><div class="detail">${formatDate(a.startDate)} ~ ${formatDate(a.endDate)}</div></div></div>`; }).join('');
+}
+function toggleArchive() { const list=document.getElementById('archiveList'); const arrow=document.getElementById('archiveArrow'); if(list)list.classList.toggle('open'); if(arrow)arrow.classList.toggle('open'); }
+
+function showCelebrate(platformId, target, days) {
+  const plat=state.platforms.find(p=>p.id===platformId);
+  const celebPlat=document.getElementById('celebPlat');
+  const celebDetail=document.getElementById('celebDetail');
+  if (celebPlat) celebPlat.textContent=plat.name;
+  if (celebDetail) celebDetail.textContent=`${target}개 제안 완료!\n${days}일 만에 달성했어요`;
+  const popup = document.getElementById('celebratePopup');
+  if (popup) popup.classList.add('open');
+  launchGalaxy();
+}
+function closeCelebrate() { const popup = document.getElementById('celebratePopup'); if(popup) popup.classList.remove('open'); const galaxy = document.getElementById('celebGalaxy'); if(galaxy) galaxy.innerHTML=''; }
+function celebOutsideClick(e) { const box = document.getElementById('celebBox'); if (box && !box.contains(e.target)) closeCelebrate(); }
+function replayCelebrate(platformId, target, startDate) { const days = daysBetween(startDate, new Date().toISOString().slice(0,10)); showCelebrate(platformId, target, days); }
+
+function launchGalaxy() {
+  const wrap=document.getElementById('celebGalaxy');
+  if (!wrap) return;
+  wrap.innerHTML='';
+  const starChars=['✦','✧','⋆','✶','✷','·','★'];
+  const starColors=['#fbbf24','#a78bfa','#60a5fa','#f472b6','#34d399','#fb923c','#e2e8f0','#818cf8','#fcd34d','#c084fc'];
+  const w=Math.min(430,window.innerWidth);
+  const h=window.innerHeight;
+  const milky=document.createElement('div');
+  milky.className='celebrate-milky';
+  wrap.appendChild(milky);
+  for(let i=0;i<120;i++){
+    const d=document.createElement('div');
+    d.className='galaxy-dot';
+    const size=1+Math.random()*3;
+    d.style.width=size+'px';
+    d.style.height=size+'px';
+    d.style.left=Math.random()*w+'px';
+    d.style.top=Math.random()*h+'px';
+    const col=starColors[Math.floor(Math.random()*starColors.length)];
+    d.style.background=col;
+    d.style.boxShadow=`0 0 ${size*2}px ${col}`;
+    d.style.setProperty('--g-dur',(1.5+Math.random()*3)+'s');
+    d.style.setProperty('--g-delay',(Math.random()*3)+'s');
+    wrap.appendChild(d);
+  }
+  for(let i=0;i<20;i++){
+    const s=document.createElement('span');
+    s.className='galaxy-star';
+    s.textContent=starChars[Math.floor(Math.random()*starChars.length)];
+    s.style.left=Math.random()*w+'px';
+    s.style.top=Math.random()*h+'px';
+    s.style.fontSize=(8+Math.random()*12)+'px';
+    s.style.color=starColors[Math.floor(Math.random()*starColors.length)];
+    s.style.setProperty('--g-dur',(2+Math.random()*3)+'s');
+    s.style.setProperty('--g-delay',(Math.random()*3)+'s');
+    wrap.appendChild(s);
+  }
+  for(let i=0;i<60;i++){
+    const s=document.createElement('span');
+    s.className='celeb-spread';
+    s.textContent=starChars[Math.floor(Math.random()*starChars.length)];
+    const angle=Math.random()*Math.PI*2;
+    const dist=80+Math.random()*Math.max(w,h)*0.6;
+    s.style.setProperty('--cs-tx',Math.cos(angle)*dist+'px');
+    s.style.setProperty('--cs-ty',Math.sin(angle)*dist+'px');
+    s.style.setProperty('--cs-dur',(2.5+Math.random()*2)+'s');
+    s.style.setProperty('--cs-delay',(Math.random()*2)+'s');
+    s.style.fontSize=(6+Math.random()*14)+'px';
+    s.style.color=starColors[Math.floor(Math.random()*starColors.length)];
+    wrap.appendChild(s);
+  }
+}
+
+function showToastGoal(msg) { const el=document.getElementById('toast'); if (!el) return; el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
+
+function renderGoalAlerts() {
+  const wrap = document.getElementById('goalAlerts');
+  if (!wrap) return;
+  const today = new Date().toISOString().slice(0,10);
+  const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
+  Object.keys(dismissed).forEach(k => { if (dismissed[k] !== today && dismissed[k] !== '__permanent__') delete dismissed[k]; });
+  localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
+  if (dismissed._all === today) { wrap.innerHTML = ''; return; }
+  if (!goals.length) { wrap.innerHTML = ''; return; }
+  const alerts = [];
+  goals.forEach(g => {
+    const plat = state.platforms.find(p=>p.id===g.platformId);
+    if (!plat) return;
+    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+    const pct = Math.min(100, Math.round((current / g.target) * 100));
+    const left = daysLeft(g.endDate);
+    const isCompleted = pct >= 100;
+    if (isCompleted) {
+      const aKey = g.id + '_archive_nudge';
+      alerts.push({ key:aKey, icon:'🏆', msg:`<b>${plat.name}</b> 목표를 달성했어요! 새 목표를 세우려면 보관함으로 이동해 주세요.`, persistent:true, goalIdx: goals.indexOf(g) });
+      return;
+    }
+    if (left === 0) {
+      const aKey = g.id + '_expired';
+      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'📦', msg:`<b>${plat.name}</b> 목표 기간이 만료되었어요` });
+      return;
+    }
+    if (left === 1) {
+      const aKey = g.id + '_1day';
+      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🚨', msg:`<b>${plat.name}</b> 내일 마감! ${current}/${g.target} 진행 중` });
+    }
+    if (left <= 3 && left > 1) {
+      const aKey = g.id + '_3day';
+      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'⏰', msg:`<b>${plat.name}</b> 마감 ${left}일 전! ${current}/${g.target} 진행 중` });
+    }
+    if ((g.target - current) === 1) {
+      const aKey = g.id + '_almost';
+      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🔥', msg:`<b>${plat.name}</b> 1개만 더 제안하면 목표 달성!` });
+    }
+    if (pct >= 50 && pct < 100) {
+      const aKey = g.id + '_50pct';
+      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🎯', msg:`<b>${plat.name}</b> 목표 절반 달성! ${current}/${g.target} (${pct}%)`, once:true });
+    }
+  });
+  if (!alerts.length) { wrap.innerHTML = ''; return; }
+  alerts.forEach(a => { if (!a.persistent) dismissed[a.key] = a.once ? '__permanent__' : today; });
+  localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
+  let html = alerts.map(a => {
+    if (a.persistent && a.goalIdx !== undefined) {
+      return `<div class="goal-alert-item" id="alert-${a.key}" style="border-color:rgba(250,204,21,0.2);background:linear-gradient(135deg,rgba(250,204,21,0.06),rgba(168,85,247,0.04));"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button onclick="archiveGoalFromAlert(${a.goalIdx})" style="flex-shrink:0;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.3);color:#fbbf24;font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;">보관함 이동</button></div>`;
+    }
+    return `<div class="goal-alert-item" id="alert-${a.key}"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button class="alert-close" onclick="dismissAlertUI('${a.key}')">&times;</button></div>`;
+  }).join('');
+  const hasNonPersistent = alerts.some(a => !a.persistent);
+  if (hasNonPersistent) html += `<div class="goal-alert-dismiss"><button onclick="dismissAllAlerts()">오늘 그만 보기</button></div>`;
+  wrap.innerHTML = html;
+}
+
+function dismissAlertUI(key) {
+  const el = document.getElementById('alert-' + key);
+  if (el) {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.2s';
+    setTimeout(()=>{ el.remove(); checkEmptyAlerts(); }, 200);
+  }
+}
+
+function dismissAllAlerts() {
+  const today = new Date().toISOString().slice(0,10);
+  const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
+  dismissed._all = today;
+  localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
+  const wrap = document.getElementById('goalAlerts');
+  if (wrap) {
+    wrap.style.opacity = '0';
+    setTimeout(()=>{ wrap.innerHTML = ''; wrap.style.opacity = '1'; }, 200);
+  }
+}
+
+function checkEmptyAlerts() {
+  const wrap = document.getElementById('goalAlerts');
+  if (wrap && !wrap.querySelector('.goal-alert-item')) wrap.innerHTML = '';
+}
+
+function archiveGoalFromAlert(idx) {
+  if (idx < 0 || idx >= goals.length) return;
+  archiveGoal(idx);
+  renderGoalAlerts();
+}
+
+// ── confirmAdd 래퍼 ──
+const originalConfirmAddGoal = window.confirmAdd;
+window.confirmAdd = function() {
+  const date=document.getElementById('add-date').value;
+  const note=document.getElementById('add-note').value.trim();
+  if (!date) return;
+  const p=state.platforms.find(p=>p.id===addPlatformId);
+  if (!p) return;
+  if (!p.submissions) p.submissions=[];
+  p.submissions.push({id:Date.now(),date,note,status:addStatus});
+  save();
+
+  const activeGoal = goals.find(g => g.platformId === addPlatformId && g.status === 'active');
+  if (activeGoal) {
+    const current = getGoalRecordCount(addPlatformId, activeGoal.startDate, activeGoal.endDate);
+    const pct = Math.min(100, Math.round((current / activeGoal.target) * 100));
+    if (pct >= 100) {
+      activeGoal.status = 'completed_pending';
+      savGoals();
+      const days = daysBetween(activeGoal.startDate, date);
+      setTimeout(()=>showCelebrate(addPlatformId, activeGoal.target, days), 300);
+      showToastGoal(`${p.name} 목표 달성 완료! 🎉`);
+    }
+  }
+
+  closeOverlay('add-modal');
+  expanded[addPlatformId]=true;
+  renderRecord(); renderAchievement(); renderGoalAlerts();
+}
+
+renderGoalAlerts();
+updateShortcut();
+
 </script>
 </body>
 </html>
