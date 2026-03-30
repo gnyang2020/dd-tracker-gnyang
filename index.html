@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>디디트래커</title>
+<script>
+(function(){
+  var ua = navigator.userAgent || navigator.vendor || '';
+  var isInApp = /KAKAOTALK|NAVER|Instagram|FB_IAB|FBAN|Line|DaumApps|SamsungBrowser\/.*CrossApp|trill|musical_ly/i.test(ua);
+  if (isInApp) {
+    if (/android/i.test(ua)) {
+      location.href = 'intent://' + location.href.replace(/https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+    } else if (/iPhone|iPad|iPod/i.test(ua)) {
+      location.href = location.href;
+    }
+  }
+})();
+</script>
 <meta name="apple-mobile-web-app-title" content="디디트래커">
 <meta name="application-name" content="디디트래커">
 <meta name="apple-mobile-web-app-capable" content="yes">
