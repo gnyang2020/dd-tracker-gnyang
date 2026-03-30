@@ -6,8 +6,9 @@
 <title>디디트래커</title>
 <script>
 (function(){
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) return;
   var ua = navigator.userAgent || navigator.vendor || '';
-  var isInApp = /KAKAOTALK|NAVER|Instagram|FB_IAB|FBAN|Line|DaumApps|SamsungBrowser\/.*CrossApp|trill|musical_ly/i.test(ua);
+  var isInApp = /KAKAOTALK|NAVER|Instagram|FB_IAB|FBAN|Line|DaumApps|trill|musical_ly/i.test(ua);
   if (isInApp) {
     if (/android/i.test(ua)) {
       location.href = 'intent://' + location.href.replace(/https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
