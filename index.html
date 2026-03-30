@@ -592,16 +592,6 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
     <span style="font-size:14px;">✦✦</span>
   </a>
 
-  <div style="margin-top:14px;display:flex;gap:10px;">
-    <button onclick="exportData()" style="flex:1;background:transparent;border:1px solid rgba(59,130,246,0.35);border-radius:14px;color:#60a5fa;font-size:13px;font-weight:600;padding:13px;cursor:pointer;font-family:inherit;">📦 데이터 백업</button>
-    <label style="flex:1;background:transparent;border:1px solid rgba(16,185,129,0.35);border-radius:14px;color:#34d399;font-size:13px;font-weight:600;padding:13px;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
-      📥 데이터 복원
-      <input type="file" accept=".json" onchange="importData(this)" style="display:none;">
-    </label>
-  </div>
-  <div style="text-align:center;font-size:11px;color:#334155;margin-top:8px;line-height:1.6;">폰을 바꿀 때 백업 후 새 기기에서 복원하세요</div>
-  <button class="reset-all-btn" onclick="resetAllData()">🗑️ 전체 정보 초기화</button>
-
   <div class="about-dd">
     <div style="font-size:30px;margin-bottom:14px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">✦</div>
     <div style="font-size:21px;font-weight:900;color:#f1f5f9;margin-bottom:4px;letter-spacing:-0.5px;">DD.Tracker <span style="font-size:15px;font-weight:400;color:#94a3b8;-webkit-text-fill-color:#94a3b8;">디디트래커</span></div>
@@ -614,6 +604,16 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
       <span onclick="document.getElementById('data-info-modal').style.display='flex'" style="display:inline-block;font-size:12px;color:#94a3b8;font-weight:500;cursor:pointer;padding:10px 20px;border:1px solid rgba(255,255,255,0.1);border-radius:12px;transition:all 0.2s;">💾 데이터 안내</span>
     </div>
   </div>
+
+  <div style="margin-top:20px;display:flex;gap:10px;">
+    <button onclick="exportData()" style="flex:1;background:transparent;border:1px solid rgba(59,130,246,0.35);border-radius:14px;color:#60a5fa;font-size:13px;font-weight:600;padding:13px;cursor:pointer;font-family:inherit;">📦 데이터 백업</button>
+    <label style="flex:1;background:transparent;border:1px solid rgba(16,185,129,0.35);border-radius:14px;color:#34d399;font-size:13px;font-weight:600;padding:13px;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
+      📥 데이터 복원
+      <input type="file" accept=".json" onchange="importData(this)" style="display:none;">
+    </label>
+  </div>
+  <div style="text-align:center;font-size:11px;color:#334155;margin-top:8px;line-height:1.6;">폰을 바꿀 때 백업 후 새 기기에서 복원하세요</div>
+  <button class="reset-all-btn" onclick="resetAllData()">🗑️ 전체 정보 초기화</button>
 
   <!-- 저작권 안내 모달 -->
   <div id="copyright-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
@@ -2309,10 +2309,11 @@ function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate()+d
 function formatDate(d) { const dt=new Date(d); return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`; }
 function daysLeft(endDate) { const now=new Date(); now.setHours(0,0,0,0); const end=new Date(endDate); end.setHours(0,0,0,0); return Math.max(0,Math.ceil((end-now)/86400000)); }
 function daysBetween(a,b) { return Math.ceil((new Date(b)-new Date(a))/86400000); }
-function getGoalRecordCount(platformId, startDate, endDate) { 
-  const p = state.platforms.find(p => p.id === platformId); 
-  if (!p || !p.submissions) return 0; 
-  return p.submissions.filter(s => s.date >= startDate && s.date <= endDate).length; 
+function getGoalRecordCount(platformId, startDate, endDate, excludeCount) {
+  const p = state.platforms.find(p => p.id === platformId);
+  if (!p || !p.submissions) return 0;
+  const total = p.submissions.filter(s => s.date >= startDate && s.date <= endDate).length;
+  return Math.max(0, total - (excludeCount || 0));
 }
 function pctColor(pct) { if(pct>=100) return '#fbbf24'; if(pct>=70) return '#22c55e'; if(pct>=40) return '#3b82f6'; return '#6366f1'; }
 
@@ -2399,7 +2400,7 @@ function renderGoals() {
   goals.forEach((g, idx) => {
     const plat = state.platforms.find(p => p.id === g.platformId);
     if (!plat) return;
-    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
     const pct = Math.min(100, Math.round((current / g.target) * 100));
     const left = daysLeft(g.endDate);
     const isCompleted = pct >= 100;
@@ -2441,7 +2442,7 @@ function openDetailModal(idx) {
   if (!g) return;
   const plat = state.platforms.find(p => p.id === g.platformId);
   if (!plat) { showToastGoal('해당 플랫폼이 삭제되었어요'); renderGoals(); return; }
-  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
   const pct = Math.min(100, Math.round((current / g.target) * 100));
   const left = daysLeft(g.endDate);
   const isCompleted = pct >= 100;
@@ -2491,7 +2492,7 @@ function openEditModal(idx) {
 function saveEdit(idx) {
   const target = parseInt(document.getElementById('editTarget').value);
   if (!target || target < 1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
-  const current = getGoalRecordCount(goals[idx].platformId, goals[idx].startDate, goals[idx].endDate);
+  const current = getGoalRecordCount(goals[idx].platformId, goals[idx].startDate, goals[idx].endDate, goals[idx].excludeCount);
   const oldStatus = goals[idx].status;
   goals[idx].target = target;
   if (current < target) goals[idx].status = 'active';
@@ -2545,7 +2546,7 @@ function updateShortcut() {
     const completedCount = validGoals.filter(g => g.status === 'completed_pending').length;
     const sums = validGoals.map(g => {
       const plat = state.platforms.find(p=>p.id===g.platformId);
-      const cur = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+      const cur = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
       const done = Math.min(cur, g.target) >= g.target;
       return `${plat.name.slice(0,3)} ${Math.min(cur,g.target)}/${g.target}${done ? '✅' : ''}`;
     });
@@ -2606,7 +2607,9 @@ function createGoal() {
   const target = parseInt(document.getElementById('modalTarget').value);
   if (!target||target<1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
   const now = new Date();
-  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:now.toISOString().slice(0,10), endDate:addDays(now,30).toISOString().slice(0,10), status:'active', completedAt:null, createdAt:now.toISOString().slice(0,10) });
+  // excludeCount: 현재 시점의 기존 제안 수를 저장 → 새 목표 카운팅에서 차감
+  const existingCount = (() => { const p = state.platforms.find(p=>p.id===platformId); if(!p||!p.submissions) return 0; const sd=now.toISOString().slice(0,10); const ed=addDays(now,30).toISOString().slice(0,10); return p.submissions.filter(s=>s.date>=sd&&s.date<=ed).length; })();
+  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:now.toISOString().slice(0,10), endDate:addDays(now,30).toISOString().slice(0,10), status:'active', completedAt:null, createdAt:now.toISOString().slice(0,10), excludeCount:existingCount });
   savGoals(); closeAddModal(); renderGoals();
   const plat = state.platforms.find(p=>p.id===platformId);
   showToastGoal(`${plat.name} 목표 ${target}개 설정 완료!`);
@@ -2617,7 +2620,7 @@ function archiveGoal(idx) {
   const g = goals[idx];
   const plat = state.platforms.find(p=>p.id===g.platformId);
   const platName = plat?.name || '목표';
-  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
   const pct = Math.min(100,Math.round((current/g.target)*100));
   archive.unshift({ ...g, status:pct>=100?'completed':'archived', completedAt:pct>=100?new Date().toISOString().slice(0,10):null, finalCount:current, finalPct:pct });
   if (archive.length>50) archive=archive.slice(0,50);
@@ -2725,7 +2728,7 @@ function renderGoalAlerts() {
   goals.forEach(g => {
     const plat = state.platforms.find(p=>p.id===g.platformId);
     if (!plat) return;
-    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+    const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
     const pct = Math.min(100, Math.round((current / g.target) * 100));
     const left = daysLeft(g.endDate);
     const isCompleted = pct >= 100;
@@ -2830,7 +2833,7 @@ function checkGoalProgress(platformId, date) {
     }
     return;
   }
-  const current = getGoalRecordCount(platformId, activeGoal.startDate, activeGoal.endDate);
+  const current = getGoalRecordCount(platformId, activeGoal.startDate, activeGoal.endDate, activeGoal.excludeCount);
   const pct = Math.min(100, Math.round((current / activeGoal.target) * 100));
   const p = state.platforms.find(p => p.id === platformId);
   if (!p) return;
@@ -2882,7 +2885,7 @@ function failGoal(idx) {
   const g = goals[idx];
   const plat = state.platforms.find(p=>p.id===g.platformId);
   const platName = plat?.name || '목표';
-  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
+  const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate, g.excludeCount);
   const pct = Math.min(100,Math.round((current/g.target)*100));
   archive.unshift({ ...g, status:'failed', completedAt:null, finalCount:current, finalPct:pct });
   if (archive.length>50) archive=archive.slice(0,50);
@@ -2950,7 +2953,9 @@ function createNextGoal(platformId) {
   const target = parseInt(document.getElementById('nextGoalTarget').value);
   if (!target||target<1) { showToastGoal('목표 횟수를 입력해주세요'); return; }
   const now = new Date();
-  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:now.toISOString().slice(0,10), endDate:addDays(now,30).toISOString().slice(0,10), status:'active', completedAt:null, createdAt:now.toISOString().slice(0,10) });
+  const sd=now.toISOString().slice(0,10); const ed=addDays(now,30).toISOString().slice(0,10);
+  const existingCount = (() => { const p = state.platforms.find(p=>p.id===platformId); if(!p||!p.submissions) return 0; return p.submissions.filter(s=>s.date>=sd&&s.date<=ed).length; })();
+  goals.push({ id:'g_'+Date.now(), platformId, target, startDate:sd, endDate:ed, status:'active', completedAt:null, createdAt:sd, excludeCount:existingCount });
   savGoals(); closeDetailModal(); renderGoals(); updateShortcut(); renderGoalAlerts();
   const plat = state.platforms.find(p=>p.id===platformId);
   showToastGoal(`${plat.name} 새 목표 ${target}개 설정 완료! 🚀`);
