@@ -1626,12 +1626,12 @@ function saveCalImage() {
     `디디트래커_달력_${new Date().toISOString().slice(0,10)}.png`, '📸 달력 이미지로 저장');
 }
 
-_0x000c();
-
 setTimeout(() => {
   const _0x0061 = document.getElementById('splash-screen');
   if (_0x0061) { _0x0061.classList.add('fade-out'); setTimeout(() => _0x0061.remove(), 500); }
 }, 1800);
+
+try { _0x000c(); } catch(e) { console.error('Init error:', e); }
 </script>
 <script>/*
  * DD.Tracker - Digital Drawing Tracker
