@@ -2518,13 +2518,24 @@ function updateShortcut() {
     summary.textContent = '플랫폼별 제안 목표를 설정해보세요';
   } else {
     el.classList.remove('empty');
-    const sums = goals.filter(g => state.platforms.find(p=>p.id===g.platformId)).map(g => {
+    const validGoals = goals.filter(g => state.platforms.find(p=>p.id===g.platformId));
+    const completedCount = validGoals.filter(g => g.status === 'completed_pending').length;
+    const sums = validGoals.map(g => {
       const plat = state.platforms.find(p=>p.id===g.platformId);
       const cur = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
-      return `${plat.name.slice(0,3)} ${Math.min(cur,g.target)}/${g.target}`;
+      const done = Math.min(cur, g.target) >= g.target;
+      return `${plat.name.slice(0,3)} ${Math.min(cur,g.target)}/${g.target}${done ? '✅' : ''}`;
     });
-    title.textContent = '🚀 이번 달 목표 확인하기';
-    summary.textContent = sums.length > 0 ? sums.join(' · ') : '목표를 확인해보세요';
+    if (completedCount > 0 && completedCount === validGoals.length) {
+      title.textContent = '🏆 목표 달성! 보관 후 새 목표 설정';
+      summary.textContent = sums.join(' · ');
+    } else if (completedCount > 0) {
+      title.textContent = '🚀 목표 진행 중 (달성 ' + completedCount + '개)';
+      summary.textContent = sums.join(' · ');
+    } else {
+      title.textContent = '🚀 이번 달 목표 확인하기';
+      summary.textContent = sums.length > 0 ? sums.join(' · ') : '목표를 확인해보세요';
+    }
   }
 }
 
@@ -2622,7 +2633,7 @@ function showCelebrate(platformId, target, days) {
 }
 function closeCelebrate() { const popup = document.getElementById('celebratePopup'); if(popup) popup.classList.remove('open'); const galaxy = document.getElementById('celebGalaxy'); if(galaxy) galaxy.innerHTML=''; }
 function celebOutsideClick(e) { const box = document.getElementById('celebBox'); if (box && !box.contains(e.target)) closeCelebrate(); }
-function replayCelebrate(platformId, target, startDate) { const days = daysBetween(startDate, new Date().toISOString().slice(0,10)); showCelebrate(platformId, target, days); }
+function replayCelebrate(platformId, target, startDate) { const pid = isNaN(platformId) ? platformId : Number(platformId); const days = daysBetween(startDate, new Date().toISOString().slice(0,10)); showCelebrate(pid, target, days); }
 
 function launchGalaxy() {
   const wrap=document.getElementById('celebGalaxy');
@@ -2685,6 +2696,7 @@ function renderGoalAlerts() {
   if (!wrap) return;
   const today = new Date().toISOString().slice(0,10);
   const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
+  // 어제 이전 일회성 dismiss 정리 (permanent는 유지)
   Object.keys(dismissed).forEach(k => { if (dismissed[k] !== today && dismissed[k] !== '__permanent__') delete dismissed[k]; });
   localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
   if (dismissed._all === today) { wrap.innerHTML = ''; return; }
@@ -2697,45 +2709,57 @@ function renderGoalAlerts() {
     const pct = Math.min(100, Math.round((current / g.target) * 100));
     const left = daysLeft(g.endDate);
     const isCompleted = pct >= 100;
+
+    // ★ 달성 완료 → 보관 유도 (항상 표시, dismiss 불가)
     if (isCompleted) {
       const aKey = g.id + '_archive_nudge';
       alerts.push({ key:aKey, icon:'🏆', msg:`<b>${plat.name}</b> 목표를 달성했어요! 새 목표를 세우려면 보관함으로 이동해 주세요.`, persistent:true, goalIdx: goals.indexOf(g) });
       return;
     }
+    // ★ 만료
     if (left === 0) {
       const aKey = g.id + '_expired';
-      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'📦', msg:`<b>${plat.name}</b> 목표 기간이 만료되었어요` });
+      if (dismissed[aKey] !== '__permanent__') alerts.push({ key:aKey, icon:'📦', msg:`<b>${plat.name}</b> 목표 기간이 만료되었어요. 연장하거나 보관함으로 이동하세요.`, dismissType:'daily' });
       return;
     }
+    // ★ 마감 1일 전 (매일 표시)
     if (left === 1) {
       const aKey = g.id + '_1day';
-      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🚨', msg:`<b>${plat.name}</b> 내일 마감! ${current}/${g.target} 진행 중` });
+      if (dismissed[aKey] !== today) alerts.push({ key:aKey, icon:'🚨', msg:`<b>${plat.name}</b> 내일 마감! ${current}/${g.target} 진행 중`, dismissType:'daily' });
     }
+    // ★ 마감 3일 이내 (매일 표시)
     if (left <= 3 && left > 1) {
       const aKey = g.id + '_3day';
-      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'⏰', msg:`<b>${plat.name}</b> 마감 ${left}일 전! ${current}/${g.target} 진행 중` });
+      if (dismissed[aKey] !== today) alerts.push({ key:aKey, icon:'⏰', msg:`<b>${plat.name}</b> 마감 ${left}일 전! ${current}/${g.target} 진행 중`, dismissType:'daily' });
     }
+    // ★ 1개 남음 (매일 표시)
     if ((g.target - current) === 1) {
       const aKey = g.id + '_almost';
-      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🔥', msg:`<b>${plat.name}</b> 1개만 더 제안하면 목표 달성!` });
+      if (dismissed[aKey] !== today) alerts.push({ key:aKey, icon:'🔥', msg:`<b>${plat.name}</b> 1개만 더 제안하면 목표 달성!`, dismissType:'daily' });
     }
+    // ★ 50% 달성 (한번만)
     if (pct >= 50 && pct < 100) {
       const aKey = g.id + '_50pct';
-      if (!dismissed[aKey]) alerts.push({ key:aKey, icon:'🎯', msg:`<b>${plat.name}</b> 목표 절반 달성! ${current}/${g.target} (${pct}%)`, once:true });
+      if (dismissed[aKey] !== '__permanent__') alerts.push({ key:aKey, icon:'🎯', msg:`<b>${plat.name}</b> 목표 절반 달성! ${current}/${g.target} (${pct}%)`, dismissType:'permanent' });
     }
   });
   if (!alerts.length) { wrap.innerHTML = ''; return; }
-  alerts.forEach(a => { if (!a.persistent) dismissed[a.key] = a.once ? '__permanent__' : today; });
+  // dismiss 처리: 배너 표시 후 기록 (다음 방문 시 안 뜨게)
+  alerts.forEach(a => {
+    if (a.persistent) return; // persistent는 dismiss 안 함
+    if (a.dismissType === 'permanent') dismissed[a.key] = '__permanent__';
+    else if (a.dismissType === 'daily') dismissed[a.key] = today;
+  });
   localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
-  let html = alerts.map(a => {
+  let alertHtml = alerts.map(a => {
     if (a.persistent && a.goalIdx !== undefined) {
       return `<div class="goal-alert-item" id="alert-${a.key}" style="border-color:rgba(250,204,21,0.2);background:linear-gradient(135deg,rgba(250,204,21,0.06),rgba(168,85,247,0.04));"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button onclick="archiveGoalFromAlert(${a.goalIdx})" style="flex-shrink:0;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.3);color:#fbbf24;font-size:11px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;">보관함 이동</button></div>`;
     }
     return `<div class="goal-alert-item" id="alert-${a.key}"><span class="alert-icon">${a.icon}</span><div class="alert-msg">${a.msg}</div><button class="alert-close" onclick="dismissAlertUI('${a.key}')">&times;</button></div>`;
   }).join('');
   const hasNonPersistent = alerts.some(a => !a.persistent);
-  if (hasNonPersistent) html += `<div class="goal-alert-dismiss"><button onclick="dismissAllAlerts()">오늘 그만 보기</button></div>`;
-  wrap.innerHTML = html;
+  if (hasNonPersistent) alertHtml += `<div class="goal-alert-dismiss"><button onclick="dismissAllAlerts()">오늘 그만 보기</button></div>`;
+  wrap.innerHTML = alertHtml;
 }
 
 function dismissAlertUI(key) {
@@ -2770,25 +2794,41 @@ function archiveGoalFromAlert(idx) {
   renderGoalAlerts();
 }
 
-// ── 목표 진행 체크 공통 함수 ──
+// ── 목표 진행 체크 공통 함수 (제안 추가 순간 즉시 호출) ──
 function checkGoalProgress(platformId, date) {
+  // active 목표만 체크
   const activeGoal = goals.find(g => g.platformId === platformId && g.status === 'active');
-  if (!activeGoal) return;
+  if (!activeGoal) {
+    // completed_pending 상태: 이미 달성했는데 보관 안 한 경우 → 알림
+    const pendingGoal = goals.find(g => g.platformId === platformId && g.status === 'completed_pending');
+    if (pendingGoal) {
+      const p = state.platforms.find(p => p.id === platformId);
+      showToastGoal(`${p?.name || ''} 목표를 보관함으로 이동해야 새 목표를 설정할 수 있어요 📦`);
+    }
+    return;
+  }
   const current = getGoalRecordCount(platformId, activeGoal.startDate, activeGoal.endDate);
   const pct = Math.min(100, Math.round((current / activeGoal.target) * 100));
   const p = state.platforms.find(p => p.id === platformId);
   if (!p) return;
+  const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
 
   if (pct >= 100) {
-    // 100% 달성 → 축하 팝업
+    // ★ 100% 달성 → 축하 팝업 + 은하수
     activeGoal.status = 'completed_pending';
     savGoals();
     const days = daysBetween(activeGoal.startDate, date || new Date().toISOString().slice(0,10));
     setTimeout(() => showCelebrate(platformId, activeGoal.target, days), 300);
-    showToastGoal(`${p.name} 목표 달성 완료! 🎉`);
+  } else if ((activeGoal.target - current) === 1) {
+    // ★ 1개 남음 → 즉시 토스트
+    const keyAlmost = activeGoal.id + '_almost_toast';
+    if (!dismissed[keyAlmost]) {
+      dismissed[keyAlmost] = '__permanent__';
+      localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
+      showToastGoal(`${p.name} 1개만 더 제안하면 목표 달성! 🔥`);
+    }
   } else if (pct >= 50) {
-    // 50% 이상 → 토스트 알림
-    const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
+    // ★ 50% 이상 → 즉시 토스트
     const key50 = activeGoal.id + '_50pct_toast';
     if (!dismissed[key50]) {
       dismissed[key50] = '__permanent__';
