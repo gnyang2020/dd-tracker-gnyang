@@ -843,7 +843,6 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
 <div class="overlay" id="day-modal">
   <div class="modal" style="max-height:80vh;overflow-y:auto;">
     <div class="modal-title" id="day-modal-title">날짜 기록</div>
-    <div id="day-entries-list"></div>
     <div class="day-add-form">
       <div style="font-size:11px;color:#475569;letter-spacing:0.1em;margin-bottom:10px;">+ 기록 추가</div>
       <div class="day-plat-pick" id="day-plat-pick"></div>
@@ -851,6 +850,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
       <input class="m-input" id="day-add-note" type="text" placeholder="메모 (선택사항)">
       <button class="m-confirm" onclick="confirmDayAdd()">추가하기</button>
     </div>
+    <div id="day-entries-list"></div>
     <button class="m-cancel" onclick="closeOverlay('day-modal')">닫기</button>
   </div>
 </div>
