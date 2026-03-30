@@ -1018,7 +1018,7 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   if (pageMap[tab]) document.getElementById(pageMap[tab]).classList.add('active');
   if (tab === 'profile')     renderProfile();
-  if (tab === 'achievement') renderAchievement();
+  if (tab === 'achievement') { renderAchievement(); updateShortcut(); renderGoalAlerts(); }
   if (tab === 'pending')     renderPending();
   if (tab === 'record')      renderRecord();
   if (tab === 'calendar')    renderCalendar();
@@ -1320,6 +1320,10 @@ function confirmDayAdd() {
   renderDayStatusPick();
   if (document.getElementById('day-add-note')) document.getElementById('day-add-note').value = '';
   renderCalendar(); renderAchievement(); renderRecord();
+  // 목표 달성 체크
+  checkGoalProgress(dayAddPlatId, dayModalDate);
+  updateShortcut();
+  renderGoalAlerts();
 }
 
 // ── 전체 초기화 ──
@@ -1615,6 +1619,8 @@ function delSub(platformId, subId) {
   if (!p) return;
   p.submissions=(p.submissions||[]).filter(s=>s.id!==subId);
   save(); renderRecord(); renderAchievement();
+  if (typeof updateShortcut === 'function') updateShortcut();
+  if (typeof renderGoalAlerts === 'function') renderGoalAlerts();
 }
 
 // ── 플랫폼 추가 ──
@@ -2764,6 +2770,34 @@ function archiveGoalFromAlert(idx) {
   renderGoalAlerts();
 }
 
+// ── 목표 진행 체크 공통 함수 ──
+function checkGoalProgress(platformId, date) {
+  const activeGoal = goals.find(g => g.platformId === platformId && g.status === 'active');
+  if (!activeGoal) return;
+  const current = getGoalRecordCount(platformId, activeGoal.startDate, activeGoal.endDate);
+  const pct = Math.min(100, Math.round((current / activeGoal.target) * 100));
+  const p = state.platforms.find(p => p.id === platformId);
+  if (!p) return;
+
+  if (pct >= 100) {
+    // 100% 달성 → 축하 팝업
+    activeGoal.status = 'completed_pending';
+    savGoals();
+    const days = daysBetween(activeGoal.startDate, date || new Date().toISOString().slice(0,10));
+    setTimeout(() => showCelebrate(platformId, activeGoal.target, days), 300);
+    showToastGoal(`${p.name} 목표 달성 완료! 🎉`);
+  } else if (pct >= 50) {
+    // 50% 이상 → 토스트 알림
+    const dismissed = JSON.parse(localStorage.getItem('dd-alert-dismissed') || '{}');
+    const key50 = activeGoal.id + '_50pct_toast';
+    if (!dismissed[key50]) {
+      dismissed[key50] = '__permanent__';
+      localStorage.setItem('dd-alert-dismissed', JSON.stringify(dismissed));
+      showToastGoal(`${p.name} 목표 절반 달성! ${current}/${activeGoal.target} (${pct}%) 🎯`);
+    }
+  }
+}
+
 // ── confirmAdd 래퍼 (원래 함수 호출 + 목표 체크) ──
 const originalConfirmAddGoal = window.confirmAdd;
 window.confirmAdd = function() {
@@ -2774,19 +2808,8 @@ window.confirmAdd = function() {
   originalConfirmAddGoal();
 
   // 목표 달성 체크
-  const activeGoal = goals.find(g => g.platformId === addPlatformId && (g.status === 'active' || g.status === 'completed_pending'));
-  if (activeGoal && activeGoal.status === 'active') {
-    const current = getGoalRecordCount(addPlatformId, activeGoal.startDate, activeGoal.endDate);
-    const pct = Math.min(100, Math.round((current / activeGoal.target) * 100));
-    if (pct >= 100) {
-      activeGoal.status = 'completed_pending';
-      savGoals();
-      const p = state.platforms.find(p=>p.id===addPlatformId);
-      const days = daysBetween(activeGoal.startDate, date);
-      setTimeout(()=>showCelebrate(addPlatformId, activeGoal.target, days), 300);
-      showToastGoal(`${p?.name || ''} 목표 달성 완료! 🎉`);
-    }
-  }
+  checkGoalProgress(addPlatformId, date);
+  updateShortcut();
   renderGoalAlerts();
 }
 
