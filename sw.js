@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'dd-tracker-v4';
+const CACHE_VERSION = 'dd-tracker-v5';
 const ASSETS = [
   './',
   './index.html',
