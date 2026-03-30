@@ -2235,12 +2235,16 @@ function installPWA() {
   const b = document.getElementById('pwa-install-banner'); if (b) b.remove();
 }
 window.addEventListener('appinstalled', () => { const b = document.getElementById('pwa-install-banner'); if (b) b.remove(); });
-// Service Worker
+// Service Worker (캐시 우회 + 자동 업데이트)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').then(reg => {
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+    reg.update();
+    setInterval(() => reg.update(), 5 * 60 * 1000);
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
-      if (nw) nw.addEventListener('statechange', () => { if (nw.state === 'activated') location.reload(); });
+      if (nw) nw.addEventListener('statechange', () => {
+        if (nw.state === 'activated') location.reload();
+      });
     });
   }).catch(e => console.log('SW fail', e));
 }
