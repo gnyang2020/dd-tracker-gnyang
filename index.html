@@ -1253,21 +1253,23 @@ function openDayModal(dateStr) {
 }
 
 function renderDayEntries() {
-  let html = '';
-  let count = 0;
+  let entries = [];
   state.platforms.forEach(p => {
     (p.submissions||[]).filter(s => s.date === dayModalDate).forEach(s => {
-      count++;
       const sc = s.status==='approved'?'#3b82f6':s.status==='rejected'?'#ef4444':'#fbbf24';
       const sl = s.status==='approved'?'승인':s.status==='rejected'?'미승인':'심사중';
-      html += `<div class="day-entry">
+      entries.push({ id:s.id, html:`<div class="day-entry">
         <div class="day-entry-dot" style="background:${p.color};box-shadow:0 0 4px ${p.color}60;"></div>
         <div class="day-entry-txt">${p.name}${s.note?` <span style="color:#475569;">· ${s.note}</span>`:''}</div>
         <div class="day-entry-badge" style="color:${sc};background:${sc}18;">${sl}</div>
         <button class="sub-del" onclick="delSubFromDay(${p.id},${s.id})">×</button>
-      </div>`;
+      </div>` });
     });
   });
+  // 최신(id가 큰 것)이 위로
+  entries.sort((a,b) => b.id - a.id);
+  let html = entries.map(e => e.html).join('');
+  let count = entries.length;
   // 시작일이면 누적 기록도 표시 (삭제 불가, 참고용)
   if (state.startDate === dayModalDate) {
     state.platforms.forEach(p => {
