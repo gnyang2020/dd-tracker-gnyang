@@ -941,6 +941,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
     <div style="font-size:52px;font-weight:900;color:#fbbf24;line-height:1;text-shadow:0 0 30px rgba(250,204,21,0.3);">100%</div>
     <div id="celebPlat" style="font-size:15px;color:#e2e8f0;font-weight:600;margin-top:8px;"></div>
     <div id="celebDetail" style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.6;white-space:pre-line;"></div>
+    <div onclick="closeCelebrate()" style="margin-top:14px;font-size:11px;color:#475569;cursor:pointer;">탭하여 닫기</div>
   </div>
 </div>
 
@@ -2323,10 +2324,24 @@ function renderRocket(pct, color, goalId) {
     </div>`;
 }
 
+// ── 고아 목표 정리 (삭제된 플랫폼 참조하는 목표 자동 보관) ──
+function cleanOrphanGoals() {
+  const orphans = goals.filter(g => !state.platforms.find(p => p.id === g.platformId));
+  if (orphans.length === 0) return;
+  orphans.forEach(g => {
+    const idx = goals.indexOf(g);
+    archive.unshift({ ...g, status:'archived', completedAt:null, finalCount:0, finalPct:0 });
+    goals.splice(idx, 1);
+  });
+  if (archive.length > 30) archive = archive.slice(0, 30);
+  savGoals();
+}
+
 // ── 목표 카드 렌더링 ──
 function renderGoals() {
   const wrap = document.getElementById('activeGoals');
   if (!wrap) return;
+  cleanOrphanGoals();
   wrap.innerHTML = '';
   if (goals.length === 0) {
     wrap.innerHTML = `
@@ -2336,6 +2351,7 @@ function renderGoals() {
         <div style="font-size:12px;color:#334155;margin-top:4px;">아래 버튼으로 이번 달 목표를 세워보세요!</div>
       </div>`;
     updateShortcut();
+    updateAddBtn();
     return;
   }
 
@@ -2381,7 +2397,9 @@ function renderGoals() {
 
 function openDetailModal(idx) {
   const g = goals[idx];
+  if (!g) return;
   const plat = state.platforms.find(p => p.id === g.platformId);
+  if (!plat) { showToastGoal('해당 플랫폼이 삭제되었어요'); renderGoals(); return; }
   const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
   const pct = Math.min(100, Math.round((current / g.target) * 100));
   const left = daysLeft(g.endDate);
@@ -2451,16 +2469,20 @@ function saveEdit(idx) {
 
 function deleteGoal(idx) {
   const g = goals[idx];
+  if (!g) return;
   const plat = state.platforms.find(p => p.id === g.platformId);
+  const platName = plat?.name || '알 수 없음';
   const box = document.getElementById('detailContent');
-  box.innerHTML = `<h3>목표 삭제</h3><div style="text-align:center;padding:16px 0;color:#94a3b8;font-size:13px;line-height:1.7;"><strong style="color:#f87171;">${plat.name}</strong> 목표를 삭제할까요?<br>삭제하면 복구할 수 없어요.</div><div class="modal-btns"><button class="cancel" onclick="closeDetailModal()">취소</button><button class="danger" onclick="confirmDelete(${idx})">삭제</button></div>`;
+  box.innerHTML = `<h3>목표 삭제</h3><div style="text-align:center;padding:16px 0;color:#94a3b8;font-size:13px;line-height:1.7;"><strong style="color:#f87171;">${platName}</strong> 목표를 삭제할까요?<br>삭제하면 복구할 수 없어요.</div><div class="modal-btns"><button class="cancel" onclick="closeDetailModal()">취소</button><button class="danger" onclick="confirmDelete(${idx})">삭제</button></div>`;
 }
 
 function confirmDelete(idx) {
+  if (idx < 0 || idx >= goals.length) return;
   const plat = state.platforms.find(p => p.id === goals[idx].platformId);
+  const platName = plat?.name || '목표';
   goals.splice(idx, 1);
   savGoals(); closeDetailModal(); renderGoals(); renderArchive();
-  showToastGoal(`${plat.name} 목표가 삭제되었어요`);
+  showToastGoal(`${platName} 목표가 삭제되었어요`);
 }
 
 function openArchiveDetail(idx) {
@@ -2479,20 +2501,20 @@ function updateShortcut() {
   const title = document.getElementById('shortcutTitle');
   const summary = document.getElementById('shortcutSummary');
   const el = document.getElementById('goalShortcut');
-  if (!title || !summary) return;
+  if (!title || !summary || !el) return;
   if (goals.length === 0) {
     el.classList.add('empty');
     title.textContent = '🚀 이번 달 목표 세우기';
     summary.textContent = '플랫폼별 제안 목표를 설정해보세요';
   } else {
     el.classList.remove('empty');
-    const sums = goals.map(g => {
+    const sums = goals.filter(g => state.platforms.find(p=>p.id===g.platformId)).map(g => {
       const plat = state.platforms.find(p=>p.id===g.platformId);
       const cur = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
-      return `${plat?.name?.slice(0,2)} ${Math.min(cur,g.target)}/${g.target}`;
+      return `${plat.name.slice(0,3)} ${Math.min(cur,g.target)}/${g.target}`;
     });
     title.textContent = '🚀 이번 달 목표 확인하기';
-    summary.textContent = sums.join(' · ');
+    summary.textContent = sums.length > 0 ? sums.join(' · ') : '목표를 확인해보세요';
   }
 }
 
@@ -2535,14 +2557,16 @@ function createGoal() {
 }
 
 function archiveGoal(idx) {
+  if (idx < 0 || idx >= goals.length) return;
   const g = goals[idx];
   const plat = state.platforms.find(p=>p.id===g.platformId);
+  const platName = plat?.name || '목표';
   const current = getGoalRecordCount(g.platformId, g.startDate, g.endDate);
   const pct = Math.min(100,Math.round((current/g.target)*100));
   archive.unshift({ ...g, status:pct>=100?'completed':'archived', completedAt:pct>=100?new Date().toISOString().slice(0,10):null, finalCount:current, finalPct:pct });
   if (archive.length>30) archive=archive.slice(0,30);
   goals.splice(idx,1); savGoals(); renderGoals(); renderArchive();
-  showToastGoal(pct>=100 ? `${plat.name} 목표 달성! 보관함으로 이동` : `${plat.name} 목표가 보관함으로 이동`);
+  showToastGoal(pct>=100 ? `${platName} 목표 달성! 보관함으로 이동` : `${platName} 목표가 보관함으로 이동`);
 }
 
 function extendGoal(idx) {
@@ -2565,6 +2589,7 @@ function toggleArchive() { const list=document.getElementById('archiveList'); co
 
 function showCelebrate(platformId, target, days) {
   const plat=state.platforms.find(p=>p.id===platformId);
+  if (!plat) return;
   const celebPlat=document.getElementById('celebPlat');
   const celebDetail=document.getElementById('celebDetail');
   if (celebPlat) celebPlat.textContent=plat.name;
