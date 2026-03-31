@@ -643,10 +643,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
     <button onclick="exportData()" style="flex:1;background:transparent;border:1px solid rgba(59,130,246,0.35);border-radius:14px;color:#60a5fa;font-size:13px;font-weight:600;padding:13px;cursor:pointer;font-family:inherit;">📦 데이터 백업</button>
     <label style="flex:1;background:transparent;border:1px solid rgba(16,185,129,0.35);border-radius:14px;color:#34d399;font-size:13px;font-weight:600;padding:13px;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
       📥 데이터 복원
-      <input type="file" accept=".json" onchange="importData(this)" style="display:none;">
+      <input type="file" accept=".json,application/json,text/plain" onchange="importData(this)" style="display:none;">
     </label>
   </div>
-  <div style="text-align:center;font-size:11px;color:#334155;margin-top:8px;line-height:1.6;">폰을 바꿀 때 백업 후 새 기기에서 복원하세요</div>
+  <div style="text-align:center;font-size:11px;color:#334155;margin-top:8px;line-height:1.6;">같은 브라우저 환경에서 백업/복원을 권장해요<br>(일부 기기 조합에서는 동작하지 않을 수 있어요)</div>
   <button class="reset-all-btn" onclick="resetAllData()">🗑️ 전체 정보 초기화</button>
 
   <!-- 저작권 안내 모달 -->
@@ -2239,13 +2239,42 @@ document.querySelectorAll('.overlay').forEach(el=>
 // ── 백업/복원 ──
 function exportData() {
   const backup = { state, goals: JSON.parse(localStorage.getItem('dd-goals')||'[]'), archive: JSON.parse(localStorage.getItem('dd-archive')||'[]'), alertDismissed: JSON.parse(localStorage.getItem('dd-alert-dismissed')||'{}'), version: 2 };
-  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.download=`디디트래커_백업_${new Date().toISOString().slice(0,10)}.json`;
-  a.href=url; document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  alert('백업 파일이 저장됐어요! (플랫폼+목표+보관함 포함) 📦');
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const fname = `dd-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+
+  // iOS Safari: a.click() 다운로드가 안 되는 경우 대비
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS && navigator.share) {
+    // iOS 공유 시트 (파일 저장/에어드롭/메일 등 선택 가능)
+    const file = new File([json], fname, {type:'application/json'});
+    navigator.share({ files:[file], title:'DD.Tracker 백업' }).catch(()=>{
+      // 공유 취소 시 fallback
+      openBlobWindow(blob, fname);
+    });
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = fname; a.href = url;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    alert('백업 파일이 저장됐어요! (플랫폼+목표+보관함 포함) 📦');
+  }
+}
+
+function openBlobWindow(blob, fname) {
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  if (!w) {
+    // 팝업 차단 시 직접 다운로드 시도
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  alert('백업 파일이 저장됐어요! 📦');
 }
 
 function importData(input) {
@@ -2270,7 +2299,7 @@ function importData(input) {
       if (typeof updateShortcut==='function') updateShortcut();
       if (typeof renderGoalAlerts==='function') renderGoalAlerts();
       alert('복원 완료! ✅');
-    } catch { alert('올바른 백업 파일이 아니에요.'); }
+    } catch(err) { alert('올바른 백업 파일이 아니에요.\n\n파일 형식을 확인해 주세요 (.json)'); }
     input.value='';
   };
   reader.readAsText(file);
@@ -2419,12 +2448,16 @@ window.addEventListener('appinstalled', () => { const b = document.getElementByI
 // Service Worker (캐시 우회 + 자동 업데이트)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
-    reg.update();
+    // 5분마다 업데이트 체크 (첫 로드 시 즉시 체크 안 함 → iOS 깜빡임 방지)
+    setTimeout(() => reg.update(), 30000);
     setInterval(() => reg.update(), 5 * 60 * 1000);
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       if (nw) nw.addEventListener('statechange', () => {
-        if (nw.state === 'activated') location.reload();
+        if (nw.state === 'activated' && navigator.serviceWorker.controller) {
+          // 이미 기존 SW가 있을 때만 리로드 (첫 설치 시 리로드 방지)
+          location.reload();
+        }
       });
     });
   }).catch(e => console.log('SW fail', e));
