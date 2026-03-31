@@ -1037,7 +1037,7 @@ let achFilter = {};      // { [platformId]: boolean } — 성취카드 필터
 let calPlatFilter = {};  // { [platformId]: boolean } — 달력 그리드 필터
 let dayModalDate = '', dayAddPlatId = null, dayAddStatus = 'submitted';
 let record7ShowAll = {};  // { [platformId]: boolean }
-let recordPeriod = 7;    // 기록 기간 필터: 7, 30, 90, 365, 0(총누적)
+let recordPeriod = (() => { try { const v = localStorage.getItem('dd-record-period'); return v !== null ? Number(v) : 7; } catch(e) { return 7; } })();
 let recPlatFilter = {};  // { [platformId]: boolean } — 기록 플랫폼 필터
 
 function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -1397,6 +1397,7 @@ function resetAllData() {
   if (!confirm('⚠️ 정말 초기화하시겠습니까?\n\n모든 작가 정보, 플랫폼, 기록이 삭제되며\n이 작업은 되돌릴 수 없습니다.')) return;
   state = { artistName:'', startDate:'', message:'', durIcon:'✦', msgIcon:'💌', crownIcon:'👑', platforms:[] };
   expanded = {}; achFilter = {}; calPlatFilter = {}; recPlatFilter = {}; record7ShowAll = {}; recordPeriod = 7;
+  try { localStorage.setItem('dd-record-period', '7'); } catch(e) {}
   save();
   renderProfile(); renderAchievement(); renderPending(); renderRecord();
   alert('초기화 완료 🗑️');
@@ -1405,6 +1406,7 @@ function resetAllData() {
 // ── 기록 기간 필터 ──
 function setRecordPeriod(days) {
   recordPeriod = days;
+  try { localStorage.setItem('dd-record-period', days); } catch(e) {}
   record7ShowAll = {}; // 기간 변경 시 더보기 초기화
   document.querySelectorAll('.rec-period-btn').forEach((btn, i) => {
     const map = [7, 30, 365, 0];
