@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>디디트래커</title>
 <script>
 // 인앱 브라우저 감지 → 외부 브라우저로 자동 이동 (PWA 독립 실행 시 건너뛰기)
@@ -31,7 +31,7 @@
 <meta name="application-name" content="디디트래커">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#3b82f6">
+<style>/* iOS 빈화면 방지: 즉시 배경색 표시 */html,body{background:#060a14;margin:0;padding:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-text-size-adjust:100%;}</style>
 <link rel="apple-touch-icon" sizes="192x192" href="data:image/png;base64,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">
 <link rel="icon" type="image/png" sizes="192x192" href="data:image/png;base64,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">
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoi65SU65SU7Yq4656Y7LukIiwic2hvcnRfbmFtZSI6IuuUlOuUlO2KuOugiOy7pCIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMDUwODEwIiwidGhlbWVfY29sb3IiOiIjN2MzYWVkIn0=">
@@ -136,6 +136,15 @@ body { font-family: 'Inter', 'Noto Sans KR', sans-serif; background: #060a14; co
 .pdc-rate-bar-bg { flex:1; height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; margin: 0 10px; }
 .pdc-rate-bar-fill { height: 100%; border-radius: 2px; }
 .pdc-rate-val { font-size: 14px; font-weight: 800; min-width: 36px; text-align: right; }
+/* 목표 달성률 원형 (플랫폼 카드 우측) */
+.pdc-goal-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; margin-left:8px; }
+.pdc-goal-circle { position:relative; width:52px; height:52px; }
+.pdc-goal-circle svg { transform:rotate(-90deg); }
+.pdc-goal-pct { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:12px; font-weight:800; }
+.pdc-goal-label { font-size:9px; font-weight:600; margin-top:3px; }
+.pdc-goal-meta { font-size:8px; color:#475569; margin-top:1px; }
+.pdc-with-goal { display:flex; gap:10px; }
+.pdc-with-goal .pdc-main { flex:1; min-width:0; }
 .ach-footer { position: relative; z-index:1; text-align: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 10px; color: #475569; letter-spacing: 0.15em; }
 .save-img-btn { width: 100%; margin-top: 14px; background: linear-gradient(135deg, #3b82f6, #4f46e5); border: none; border-radius: 14px; color: white; font-size: 15px; font-weight: 700; padding: 15px; cursor: pointer; font-family: inherit; }
 
@@ -180,6 +189,15 @@ body { font-family: 'Inter', 'Noto Sans KR', sans-serif; background: #060a14; co
 .sub-note { font-size: 13px; color: #64748b; flex:1; }
 .sub-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; flex-shrink: 0; }
 .sub-del { background: none; border: none; color: #334155; cursor: pointer; font-size: 16px; padding: 0; flex-shrink: 0; }
+.sub-row.tappable { cursor: pointer; transition: background 0.15s; border-radius: 8px; margin: 0 -6px; padding: 8px 6px; }
+.sub-row.tappable:active { background: rgba(59,130,246,0.08); }
+.pi-card.tappable { cursor: pointer; transition: background 0.15s; }
+.pi-card.tappable:active { background: #111b30; }
+/* 수정 모달 */
+.edit-sub-actions { margin-top:14px; }
+.edit-sub-actions .m-confirm { width:100%; }
+.edit-del-btn { width:100%; margin-top:8px; padding:10px 0; border-radius:10px; border:none; background:transparent; color:#475569; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; transition:color 0.2s; }
+.edit-del-btn:active { color:#ef4444; }
 .add-sub-btn { width: 100%; margin-top: 10px; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(129,140,248,0.15)); border: 1px solid rgba(59,130,246,0.4); border-radius: 12px; color: #a5b4fc; font-size: 14px; font-weight: 600; padding: 13px; cursor: pointer; font-family: inherit; box-shadow: 0 0 12px rgba(59,130,246,0.1); }
 .record-note { text-align: center; font-size: 11px; color: #334155; padding: 12px 0 0; }
 
@@ -883,6 +901,21 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
   </div>
 </div>
 
+<!-- 기록 수정 모달 -->
+<div class="overlay" id="edit-sub-modal">
+  <div class="modal">
+    <div class="modal-title" id="edit-sub-title">기록 수정</div>
+    <input class="m-input" id="edit-sub-date" type="date">
+    <input class="m-input" id="edit-sub-note" type="text" placeholder="메모 (선택사항)">
+    <div class="status-pick" id="edit-sub-status-pick"></div>
+    <div class="edit-sub-actions">
+      <button class="m-confirm" onclick="confirmEditSub()">수정하기</button>
+    </div>
+    <button class="m-cancel" onclick="closeOverlay('edit-sub-modal')">취소</button>
+    <button class="edit-del-btn" onclick="deleteEditSub()">이 기록 삭제</button>
+  </div>
+</div>
+
 <!-- 플랫폼 추가 모달 -->
 <div class="overlay" id="platform-modal">
   <div class="modal">
@@ -980,7 +1013,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.4); }
 <div id="toast"></div>
 
 <script>
-const COLORS = ['#f59e0b','#10b981','#3b82f6','#ef4444','#3b82f6','#ec4899','#8b5cf6','#14b8a6','#f97316','#06b6d4'];
+const COLORS = ['#f59e0b','#10b981','#3b82f6','#ef4444','#ec4899','#8b5cf6','#f97316'];
 const KEY = 'dd-tracker';
 const PORTFOLIO_TYPES = [
   {id:'emoticon', label:'Emoticon Portfolio'},
@@ -1010,8 +1043,8 @@ let recPlatFilter = {};  // { [platformId]: boolean } — 기록 플랫폼 필�
 function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
 // ── 포커스 핸들러 ──
-function clearFocus(el) { el.dataset.prev = el.value; el.value = ''; }
-function restoreFocus(el) { if (!el.value.trim()) el.value = el.dataset.prev || ''; }
+function clearFocus(el) { /* 기존 텍스트 유지 - 커서만 포커스 */ }
+function restoreFocus(el) { /* blur 시 별도 처리 없음 */ }
 
 // ── 플랫폼 통계 (누적 + 개별 합산) ──
 function pStats(p) {
@@ -1053,6 +1086,7 @@ function switchTab(tab) {
   if (tab === 'pending')     renderPending();
   if (tab === 'record')      renderRecord();
   if (tab === 'calendar')    renderCalendar();
+  try { localStorage.setItem('dd-last-tab', tab); } catch(e) {}
 }
 
 // ── 내 정보 ──
@@ -1274,11 +1308,10 @@ function renderDayEntries() {
     (p.submissions||[]).filter(s => s.date === dayModalDate).forEach(s => {
       const sc = s.status==='approved'?'#3b82f6':s.status==='rejected'?'#ef4444':'#fbbf24';
       const sl = s.status==='approved'?'승인':s.status==='rejected'?'미승인':'심사중';
-      entries.push({ id:s.id, html:`<div class="day-entry">
+      entries.push({ id:s.id, html:`<div class="day-entry" style="cursor:pointer;" onclick="openEditSub(${p.id},${s.id})">
         <div class="day-entry-dot" style="background:${p.color};box-shadow:0 0 4px ${p.color}60;"></div>
         <div class="day-entry-txt">${p.name}${s.note?` <span style="color:#475569;">· ${s.note}</span>`:''}</div>
         <div class="day-entry-badge" style="color:${sc};background:${sc}18;">${sl}</div>
-        <button class="sub-del" onclick="delSubFromDay(${p.id},${s.id})">×</button>
       </div>` });
     });
   });
@@ -1458,7 +1491,34 @@ function renderAchievement() {
     const aPct = st.total ? st.approved/st.total*100 : 0;
     const pPct = st.total ? st.pending /st.total*100 : 0;
     const rPct = st.total ? st.rejected/st.total*100 : 0;
-    return `<div class="pdc">
+
+    // 이 플랫폼에 활성 목표가 있는지 확인
+    const activeGoal = (typeof goals !== 'undefined') ? goals.find(g => g.platformId === p.id) : null;
+    let goalHtml = '';
+    if (activeGoal) {
+      const current = getGoalRecordCount(activeGoal.platformId, activeGoal.startDate, activeGoal.endDate, activeGoal.excludeCount);
+      const gPct = Math.min(100, Math.round((current / activeGoal.target) * 100));
+      const left = daysLeft(activeGoal.endDate);
+      const isComplete = gPct >= 100;
+      const circleR = 21, circleC = 2 * Math.PI * circleR;
+      const dashLen = Math.round(circleC * gPct / 100);
+      const gc = isComplete ? '#34d399' : '#a78bfa';
+      const gLabel = isComplete ? '달성!' : '목표';
+      const gMeta = isComplete ? `${current}/${activeGoal.target}` : `${current}/${activeGoal.target} · ${left}일`;
+      goalHtml = `<div class="pdc-goal-wrap">
+        <div class="pdc-goal-circle">
+          <svg width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="${circleR}" fill="none" stroke="#1e293b" stroke-width="4"/>
+            <circle cx="26" cy="26" r="${circleR}" fill="none" stroke="${gc}" stroke-width="4" stroke-dasharray="${dashLen} ${circleC}" stroke-linecap="round"/>
+          </svg>
+          <div class="pdc-goal-pct" style="color:${gc};">${gPct}%</div>
+        </div>
+        <div class="pdc-goal-label" style="color:${gc};">${gLabel}</div>
+        <div class="pdc-goal-meta">${gMeta}</div>
+      </div>`;
+    }
+
+    const mainContent = `
       <div class="pdc-top">
         <div class="pdc-dot" style="background:${p.color};box-shadow:0 0 7px ${p.color}80;"></div>
         <div class="pdc-name">${p.name}</div>
@@ -1481,8 +1541,12 @@ function renderAchievement() {
         <div class="pdc-rate-lbl">승인률</div>
         <div class="pdc-rate-bar-bg"><div class="pdc-rate-bar-fill" style="width:${r}%;background:${rc};"></div></div>
         <div class="pdc-rate-val" style="color:${rc};">${r}%</div>
-      </div>
-    </div>`;
+      </div>`;
+
+    if (goalHtml) {
+      return `<div class="pdc"><div class="pdc-with-goal"><div class="pdc-main">${mainContent}</div>${goalHtml}</div></div>`;
+    }
+    return `<div class="pdc">${mainContent}</div>`;
   }).join('') || '<div style="text-align:center;color:#334155;font-size:13px;padding:20px 0;">플랫폼을 선택해주세요</div>';
 }
 
@@ -1502,12 +1566,12 @@ function renderPending() {
   }
   list.innerHTML = all.sort((a,b)=>a.date<b.date?1:-1).map(s => `
     <div class="pi-card">
-      <div class="pi-top">
+      <div class="pi-top" style="cursor:pointer;" onclick="openEditSub(${s.platformId},${s.id})">
         <div class="pi-dot" style="background:${s.platColor};"></div>
         <div class="pi-plat">${s.platName}</div>
         <div class="pi-date">${s.date}</div>
       </div>
-      <div class="pi-note">${s.note||'메모 없음'}</div>
+      <div class="pi-note" style="cursor:pointer;" onclick="openEditSub(${s.platformId},${s.id})">${s.note||'메모 없음'}</div>
       <div class="pi-btns">
         <button class="pi-btn pi-approve" onclick="updateStatus(${s.platformId},${s.id},'approved')">✓ 승인</button>
         <button class="pi-btn pi-reject" onclick="updateStatus(${s.platformId},${s.id},'rejected')">✕ 미승인</button>
@@ -1592,11 +1656,10 @@ function renderRecord() {
             const rows = display.map(s=>{
               const sc=s.status==='approved'?'#3b82f6':s.status==='rejected'?'#ef4444':'#fbbf24';
               const sl=s.status==='approved'?'승인':s.status==='rejected'?'미승인':'심사중';
-              return `<div class="sub-row">
+              return `<div class="sub-row tappable" onclick="openEditSub(${p.id},${s.id})">
                 <div class="sub-date">${s.date}</div>
                 <div class="sub-note">${s.note||''}</div>
                 <div class="sub-badge" style="color:${sc};background:${sc}18;">${sl}</div>
-                <button class="sub-del" onclick="delSub(${p.id},${s.id})">×</button>
               </div>`;
             }).join('');
             const btn = hiddenCnt > 0 && !showAll
@@ -1658,6 +1721,59 @@ function delSub(platformId, subId) {
   save(); renderRecord(); renderAchievement();
   if (typeof updateShortcut === 'function') updateShortcut();
   if (typeof renderGoalAlerts === 'function') renderGoalAlerts();
+}
+
+// ── 기록 수정 모달 ──
+let editSubPlatId = null, editSubId = null, editSubStatus = 'submitted';
+
+function openEditSub(platformId, subId) {
+  editSubPlatId = platformId; editSubId = subId;
+  const p = state.platforms.find(p=>p.id===platformId);
+  if (!p) return;
+  const s = (p.submissions||[]).find(s=>s.id===subId);
+  if (!s) return;
+  editSubStatus = s.status;
+  document.getElementById('edit-sub-title').textContent = p.name + ' · 기록 수정';
+  document.getElementById('edit-sub-date').value = s.date;
+  document.getElementById('edit-sub-note').value = s.note || '';
+  renderEditSubStatusPick();
+  openOverlay('edit-sub-modal');
+}
+
+function renderEditSubStatusPick() {
+  const items=[['submitted','심사중','#fbbf24'],['approved','승인','#3b82f6'],['rejected','미승인','#ef4444']];
+  document.getElementById('edit-sub-status-pick').innerHTML = items.map(([val,label,color])=>
+    `<button class="sp-btn" onclick="setEditSubStatus('${val}')" style="${editSubStatus===val?`border-color:${color};background:${color}18;color:${color};`:''}">${label}</button>`).join('');
+}
+
+function setEditSubStatus(s) { editSubStatus=s; renderEditSubStatusPick(); }
+
+function confirmEditSub() {
+  const p = state.platforms.find(p=>p.id===editSubPlatId);
+  if (!p) return;
+  const s = (p.submissions||[]).find(s=>s.id===editSubId);
+  if (!s) return;
+  const newDate = document.getElementById('edit-sub-date').value;
+  if (!newDate) return;
+  s.date = newDate;
+  s.note = document.getElementById('edit-sub-note').value.trim();
+  s.status = editSubStatus;
+  save();
+  closeOverlay('edit-sub-modal');
+  renderRecord(); renderPending(); renderAchievement();
+  if (typeof renderDayEntries === 'function') renderDayEntries();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  showToastGoal('기록이 수정되었어요');
+}
+
+function deleteEditSub() {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  delSub(editSubPlatId, editSubId);
+  closeOverlay('edit-sub-modal');
+  renderPending();
+  if (typeof renderDayEntries === 'function') renderDayEntries();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  showToastGoal('기록이 삭제되었어요');
 }
 
 // ── 플랫폼 추가 ──
@@ -2272,7 +2388,14 @@ setTimeout(() => {
 }, 1800);
 
 // ── 초기화 ──
-try { renderAchievement(); } catch(e) { console.error('Init error:', e); }
+try {
+  const lastTab = localStorage.getItem('dd-last-tab');
+  if (lastTab && ['profile','achievement','pending','record','calendar'].includes(lastTab)) {
+    switchTab(lastTab);
+  } else {
+    renderAchievement();
+  }
+} catch(e) { console.error('Init error:', e); }
 </script>
 <script>
 // PWA 설치 프롬프트
@@ -2438,7 +2561,7 @@ function renderGoals() {
         </div>
         <div class="goal-nums">
           <div class="goal-big">${Math.min(current, g.target)}<span> / ${g.target}</span></div>
-          <div class="goal-pct" style="color:${pctColor(pct)}">${pct}%</div>
+          <div class="goal-pct" style="color:${pctColor(pct)};font-size:28px;font-weight:900;letter-spacing:-1px;">${pct}%</div>
         </div>
         <div class="progress-wrap">
           <div class="progress-bar">
